@@ -1,0 +1,23 @@
+﻿# Dependencies and generated output
+**/node_modules/
+**/.next/
+**/out/
+**/build/
+**/coverage/
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# Local secrets and environment files
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local deployment state
+**/.vercel/
+
+# Agent/session artifacts (local only)
+.maestri/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

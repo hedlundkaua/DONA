@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+
+  /* Paleta extraída das referências mobile (Painel e Nova venda) */
+  --color-navy: #10235c;
+  --color-navy-900: #071a4f;
+  --color-plum: #9c1155;
+  --color-pink: #e5176e;
+  --color-pink-50: #fdeaf3;
+  --color-pink-100: #fce8f2;
+  --color-line: #ddd6e6;
+  --color-muted: #5b6070;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: #ffffff;
+    color: var(--color-navy);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: var(--color-pink);
+    color: #ffffff;
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+}
+
+@utility safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+}
