@@ -19,6 +19,7 @@ export default function proxy(req: NextRequest) {
   if (
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
+    pathname.startsWith("/_vercel/insights/") ||
     pathname === "/favicon.ico"
   ) {
     return NextResponse.next();
