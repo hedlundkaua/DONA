@@ -35,15 +35,15 @@ export function emailProviderConfigured(): boolean {
   }
   return false;
 }
-const purposeText = (purpose: CodePurpose) => purpose === "verification" ? "verificaÃ§Ã£o do e-mail" : "redefiniÃ§Ã£o da senha";
+const purposeText = (purpose: CodePurpose) => purpose === "verification" ? "verificação do e-mail" : "redefinição da senha";
 
 /** Delivers codes only through the selected provider. It never logs message bodies, recipients, or codes. */
 export async function sendAuthCode(to: string, code: string, purpose: CodePurpose): Promise<boolean> {
   if (!emailProviderConfigured()) return false;
   const provider = process.env.EMAIL_PROVIDER;
-  const subject = purpose === "verification" ? "CÃ³digo de verificaÃ§Ã£o DONA" : "CÃ³digo para redefinir sua senha DONA";
-  const text = `Seu cÃ³digo para ${purposeText(purpose)} Ã© ${code}. Ele expira em 10 minutos. Se vocÃª nÃ£o solicitou esta aÃ§Ã£o, ignore esta mensagem.`;
-  const html = `<p>Seu cÃ³digo para ${purposeText(purpose)} Ã© <strong>${code}</strong>.</p><p>Ele expira em 10 minutos. Se vocÃª nÃ£o solicitou esta aÃ§Ã£o, ignore esta mensagem.</p>`;
+  const subject = purpose === "verification" ? "Código de verificação DONA" : "Código para redefinir sua senha DONA";
+  const text = `Seu código para ${purposeText(purpose)} é ${code}. Ele expira em 10 minutos. Se você não solicitou esta ação, ignore esta mensagem.`;
+  const html = `<p>Seu código para ${purposeText(purpose)} é <strong>${code}</strong>.</p><p>Ele expira em 10 minutos. Se você não solicitou esta ação, ignore esta mensagem.</p>`;
 
   try {
     if (provider === "ethereal") {

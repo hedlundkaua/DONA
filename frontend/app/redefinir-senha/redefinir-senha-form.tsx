@@ -159,7 +159,7 @@ export function RedefinirSenhaForm({ emailInicial }: { emailInicial: string }) {
           label="Código recebido"
           htmlFor="redefinir-codigo"
           required
-          hint={`${OTP_VALIDADE_MINUTOS} minutos de validade; até ${OTP_MAX_TENTATIVAS} tentativas.`}
+          hint={`${OTP_VALIDADE_MINUTOS} minutos de validade; até ${OTP_MAX_TENTATIVAS} tentativas. Confira também as pastas Spam e Lixo eletrônico.`}
           error={erros.codigo}
         >
           <OtpInput

@@ -232,6 +232,9 @@ export function VerificarEmailForm({
       </Button>
 
       <div className="mt-4 rounded-xl bg-pink-50 px-3.5 py-3">
+        <p className="mb-2 text-xs text-muted">
+          Não encontrou o e-mail? Confira também as pastas Spam e Lixo eletrônico.
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-medium text-muted">
             Não recebeu o código?

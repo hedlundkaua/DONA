@@ -14,6 +14,7 @@ import {
   OTP_REENVIO_SEGUNDOS,
 } from "@/lib/auth";
 import { apiFetch } from "@/lib/http";
+import { RedefinirSenhaForm } from "@/app/redefinir-senha/redefinir-senha-form";
 
 export function EsqueciSenhaForm({ emailInicial }: { emailInicial: string }) {
   const [email, setEmail] = useState(emailInicial);
@@ -70,6 +71,20 @@ export function EsqueciSenhaForm({ emailInicial }: { emailInicial: string }) {
     // A resposta é deliberadamente genérica para não revelar se a conta existe.
     setSucesso(true);
     setCooldown(OTP_REENVIO_SEGUNDOS);
+  }
+
+  if (sucesso) {
+    return (
+      <div className="mt-4">
+        <InlineAlert tom="sucesso" className="mb-4">
+          {MENSAGEM_RECUPERACAO_GENERICA}
+        </InlineAlert>
+        <p className="mb-4 text-sm text-muted">
+          Não encontrou o e-mail? Confira também as pastas Spam e Lixo eletrônico.
+        </p>
+        <RedefinirSenhaForm emailInicial={normalizarEmail(email)} />
+      </div>
+    );
   }
 
   const hrefRedefinir = emailValido(email)
