@@ -18,7 +18,7 @@ Para perfis com permissÃ£o na operaÃ§Ã£o, ID inexistente e ID de outro ten
 
 Payload exato: `{ "nome": string, "nomeUsuario": string, "email": string, "senha": string }`.
 
-Senha: mÃ­nimo 12 caracteres e mÃ¡ximo 72 bytes UTF-8. `nomeUsuario` aceita letras ASCII, nÃºmeros, ponto, sublinhado e hÃ­fen, com 3â€“50 caracteres. Email tem validaÃ§Ã£o sintÃ¡tica e atÃ© 254 caracteres. Payload malformado retorna 400 antes de consulta de existÃªncia. Payload vÃ¡lido sempre retorna 202 genÃ©rico, inclusive quando email/nomeUsuario jÃ¡ existem; nÃ£o cria sessÃ£o. Resposta: `{ success: true, data: { status: "EMAIL_VERIFICATION_REQUIRED", message: string } }`.
+Senha: mÃ­nimo 8 caracteres Unicode e mÃ¡ximo 72 bytes UTF-8. `nomeUsuario` aceita letras ASCII, nÃºmeros, ponto, sublinhado e hÃ­fen, com 3â€“50 caracteres. Email tem validaÃ§Ã£o sintÃ¡tica e atÃ© 254 caracteres. Payload malformado retorna 400 antes de consulta de existÃªncia. Payload vÃ¡lido sempre retorna 202 genÃ©rico, inclusive quando email/nomeUsuario jÃ¡ existem; nÃ£o cria sessÃ£o. Resposta: `{ success: true, data: { status: "EMAIL_VERIFICATION_REQUIRED", message: string } }`.
 
 O usuÃ¡rio pÃºblico inicial recebe perfil `ADMINISTRADOR`, mas nÃ£o autentica atÃ© confirmar o email. NÃ£o existe perfil/senha padrÃ£o.
 

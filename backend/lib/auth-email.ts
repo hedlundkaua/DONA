@@ -9,10 +9,12 @@ function etherealTestRuntime(): boolean {
     const url = new URL(process.env.DATABASE_URL ?? "");
     const database = decodeURIComponent(url.pathname.slice(1));
     const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    const r5Target = url.port === "5433" && database === "dona_test_r5";
+    const isolatedPlanTarget = url.port === "5544" && database === "dona_backend_plan_test_20261113";
+    const irisIntegrationTarget = url.port === "5546" && database === "dona_iris_integration_20261113";
     return ["postgres:", "postgresql:"].includes(url.protocol)
       && ["localhost", "127.0.0.1", "::1"].includes(hostname)
-      && url.port === "5433"
-      && database === "dona_test_r5";
+      && (r5Target || isolatedPlanTarget || irisIntegrationTarget);
   } catch { return false; }
 }
 

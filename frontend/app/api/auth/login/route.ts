@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendUrl } from "@/lib/api";
-import { CSRF_COOKIE, SESSION_MAX_AGE } from "@/lib/cookies";
+import {
+  CSRF_COOKIE,
+  maxAgeCsrfDaSessao,
+  maxAgeSessao,
+} from "@/lib/cookies";
 import { copiarSetCookie } from "@/lib/server-cookies";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +25,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Usado apenas como fallback se o backend ainda não devolver a validade
+  // efetiva da sessão. O corpo encaminhado permanece exatamente o original.
+  let lembrarDeMim = false;
+  try {
+    const entrada = JSON.parse(corpo) as { lembrarDeMim?: unknown } | null;
+    lembrarDeMim = entrada?.lembrarDeMim === true;
+  } catch {
+    // O backend valida o JSON; aqui só não há fallback booleano.
+  }
+
   try {
     const resposta = await fetch(`${backendUrl()}/api/auth/login`, {
       method: "POST",
@@ -36,7 +50,13 @@ export async function POST(req: NextRequest) {
     const texto = await resposta.text();
     let dados: {
       success?: boolean;
-      data?: { user?: unknown; csrfToken?: string };
+      data?: {
+        user?: unknown;
+        csrfToken?: string;
+        csrfMaxAgeSeconds?: unknown;
+        expiresAt?: unknown;
+        session?: { expiresAt?: unknown } | null;
+      };
       error?: string;
     } | null = null;
     try {
@@ -55,18 +75,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const maxAge = maxAgeCsrfDaSessao(
+      dados.data,
+      maxAgeSessao(lembrarDeMim),
+    );
     const saida = NextResponse.json({
       success: true,
-      data: { user: dados.data?.user },
+      data: {
+        user: dados.data?.user,
+        csrfMaxAgeSeconds: maxAge,
+        expiresAt:
+          dados.data?.expiresAt ?? dados.data?.session?.expiresAt ?? null,
+      },
     });
 
     if (typeof dados.data?.csrfToken === "string" && dados.data.csrfToken) {
       saida.cookies.set(CSRF_COOKIE, dados.data.csrfToken, {
         httpOnly: true,
         sameSite: "lax",
-        secure: req.nextUrl.protocol === "https:",
+        secure:
+          req.nextUrl.protocol === "https:" ||
+          req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https",
         path: "/",
-        maxAge: SESSION_MAX_AGE,
+        maxAge,
       });
     }
 

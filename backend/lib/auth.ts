@@ -15,7 +15,7 @@ export type AuthenticatedUser = {
   ativo: boolean;
 };
 
-export type AuthResult = { ok: true; user: AuthenticatedUser; sessionId: string; csrfToken: string } | { ok: false; response: NextResponse };
+export type AuthResult = { ok: true; user: AuthenticatedUser; sessionId: string; sessionExpiresAt: Date; csrfToken: string } | { ok: false; response: NextResponse };
 
 const cookieName = () => process.env.NODE_ENV === "production" ? "__Host-dona_session" : "dona_session";
 const errorResponse = (status: number, error: string) => NextResponse.json({ success: false, error }, { status });
@@ -140,17 +140,18 @@ export async function requireUser(request: Request, roles: PerfilUsuario[]): Pro
       ativo: session.usuario.ativo,
     },
     sessionId: session.id,
+    sessionExpiresAt: session.expiraEm,
     csrfToken: csrfForToken(token),
   };
 }
 
-export function setSessionCookie(response: NextResponse, token: string): void {
+export function setSessionCookie(response: NextResponse, token: string, maxAgeSeconds = sessionTtlSeconds()): void {
   response.cookies.set(cookieName(), token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: sessionTtlSeconds(),
+    maxAge: maxAgeSeconds,
   });
 }
 

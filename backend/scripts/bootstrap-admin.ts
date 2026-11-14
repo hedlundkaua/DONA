@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { FinalidadeOtp, PerfilUsuario, PrismaClient, StatusNegocio } from "@prisma/client";
 import { issueOtp } from "../lib/otp";
 import { emailProviderConfigured } from "../lib/auth-email";
+import { isValidNewPassword } from "../lib/password-policy";
 
 const prisma = new PrismaClient();
 
@@ -12,7 +13,7 @@ async function main() {
   const senha = process.env.BOOTSTRAP_ADMIN_PASSWORD;
   if (!nome || !nomeUsuario || !email || !senha) throw new Error("Configure BOOTSTRAP_ADMIN_NAME, BOOTSTRAP_ADMIN_USERNAME, BOOTSTRAP_ADMIN_EMAIL e BOOTSTRAP_ADMIN_PASSWORD no processo.");
   if (nome.length > 150 || !/^[a-z0-9._-]{3,50}$/.test(nomeUsuario) || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Dados iniciais inválidos.");
-  if (senha.length < 12 || Buffer.byteLength(senha, "utf8") > 72) throw new Error("A senha deve ter ao menos 12 caracteres e no máximo 72 bytes.");
+  if (!isValidNewPassword(senha)) throw new Error("Password needs 8 characters, max 72 UTF-8 bytes, and cannot be common.");
 
   if (!emailProviderConfigured()) throw new Error("Email provider not configured; no database changes made.");
   if (await prisma.usuario.count() !== 0) throw new Error("Bootstrap recusado: já existem usuários. Não atribua dados legados automaticamente; siga docs/multi-tenancy-auth.md.");

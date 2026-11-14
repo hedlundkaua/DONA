@@ -5,6 +5,7 @@ import { PageTitle } from "@/components/ui/page-title";
 import {
   ChevronRightIcon,
   ClipboardIcon,
+  LockIcon,
   MovementsIcon,
   TagIcon,
 } from "@/components/ui/icons";
@@ -33,6 +34,13 @@ const atalhos = [
     Icone: ClipboardIcon,
     testId: "mais-ajustes",
   },
+  {
+    href: "/mais/senha",
+    titulo: "Alterar senha",
+    descricao: "Atualize sua senha de acesso e encerre as outras sessões.",
+    Icone: LockIcon,
+    testId: "mais-senha",
+  },
 ] as const;
 
 export default function MaisPage() {
@@ -46,7 +54,7 @@ export default function MaisPage() {
 
       <Card className="p-0">
         <div className="px-4 pt-4">
-          <CardTitle>Cadastros e estoque</CardTitle>
+          <CardTitle>Cadastros, estoque e segurança</CardTitle>
         </div>
         <div className="mt-3 divide-y divide-line">
           {atalhos.map(({ href, titulo, descricao, Icone, testId }) => (

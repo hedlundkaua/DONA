@@ -13,7 +13,13 @@ export interface SessionUser {
 }
 
 export type Sessao =
-  | { status: "autenticado"; user: SessionUser; csrfToken: string }
+  | {
+      status: "autenticado";
+      user: SessionUser;
+      csrfToken: string;
+      csrfMaxAgeSeconds?: number;
+      expiresAt?: string;
+    }
   | { status: "anonimo" }
   | { status: "indisponivel"; mensagem: string };
 
@@ -59,7 +65,13 @@ export const getSession = cache(async (): Promise<Sessao> => {
     const corpo = (await resposta.json().catch(() => null)) as
       | {
           success?: boolean;
-          data?: { user?: SessionUser; csrfToken?: string };
+          data?: {
+            user?: SessionUser;
+            csrfToken?: string;
+            csrfMaxAgeSeconds?: unknown;
+            expiresAt?: unknown;
+            session?: { expiresAt?: unknown } | null;
+          };
           error?: string;
         }
       | null;
@@ -77,6 +89,18 @@ export const getSession = cache(async (): Promise<Sessao> => {
       status: "autenticado",
       user: corpo.data.user,
       csrfToken: corpo.data.csrfToken ?? "",
+      csrfMaxAgeSeconds:
+        typeof corpo.data.csrfMaxAgeSeconds === "number" &&
+        Number.isFinite(corpo.data.csrfMaxAgeSeconds) &&
+        corpo.data.csrfMaxAgeSeconds > 0
+          ? Math.floor(corpo.data.csrfMaxAgeSeconds)
+          : undefined,
+      expiresAt:
+        typeof corpo.data.expiresAt === "string"
+          ? corpo.data.expiresAt
+          : typeof corpo.data.session?.expiresAt === "string"
+            ? corpo.data.session.expiresAt
+            : undefined,
     };
   } catch {
     return {

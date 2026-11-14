@@ -38,7 +38,7 @@ export default async function LoginPage({
     >
       <AuthCard
         titulo="Entrar na conta"
-        descricao="Use o usuário ou e-mail que você cadastrou e a sua senha."
+        descricao="Use seu e-mail e a sua senha. Contas antigas também podem entrar com o usuário."
       >
         <LoginForm
           destino={destino}

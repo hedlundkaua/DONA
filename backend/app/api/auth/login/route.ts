@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     if (!body) return badRequest("Corpo JSON inválido.");
     const identifier = typeof body.identifier === "string" ? body.identifier.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    if (body.lembrarDeMim !== undefined && typeof body.lembrarDeMim !== "boolean") return badRequest("lembrarDeMim deve ser booleano.");
     if (!identifier || identifier.length > 254 || !password || Buffer.byteLength(password, "utf8") > 72) {
       return badRequest("Informe usuário/e-mail e senha válidos.");
     }
@@ -38,13 +39,14 @@ export async function POST(req: NextRequest) {
     await clearLoginFailures(throttleKey);
     const token = newSessionToken();
     const csrfToken = csrfForToken(token);
-    const expiresAt = new Date(Date.now() + sessionTtlSeconds() * 1000);
+    const ttlSeconds = body.lembrarDeMim === true ? 30 * 24 * 60 * 60 : sessionTtlSeconds();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
     await prisma.sessaoUsuario.create({ data: { negocioId: user.negocioId, usuarioId: user.id, authVersion: user.authVersion, tokenHash: hashSessionToken(token), expiraEm: expiresAt } });
 
     const response = NextResponse.json({ success: true, data: { user: {
       id: user.id, nome: user.nome, nomeUsuario: user.nomeUsuario, email: user.email, perfil: user.perfil,
-    }, csrfToken } }, { status: 200 });
-    setSessionCookie(response, token);
+    }, csrfToken, csrfMaxAgeSeconds: ttlSeconds, expiresAt: expiresAt.toISOString() } }, { status: 200 });
+    setSessionCookie(response, token, ttlSeconds);
     return response;
   } catch (err) { return serverError(err); }
 }

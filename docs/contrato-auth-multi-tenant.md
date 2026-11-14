@@ -1,10 +1,10 @@
-# Autenticação e multi-tenant — contrato provisório no frontend
+# Autenticação e multi-tenant — contrato confirmado no frontend
 
 **Status:** telas e pass-through implementados; integração real pendente da
-publicação dos endpoints pelo backend.
+publicação dos endpoints atualizados pelo backend.
 **Data:** 12/11/2026
 **Responsável:** Luma (frontend)
-**Contrato de origem:** mensagem do Cedro via Codex, ainda provisória.
+**Contrato de origem:** Cedro via Codex, confirmado em 13/11/2026.
 **Referência de backend:** `backend/docs/multi-tenancy-auth.md` (não encontrado
 no repositório no momento desta implementação).
 
@@ -15,7 +15,7 @@ as rotas abaixo, sem mocks, e mantém a sessão/CSRF do login existente.
 
 | Método | Rota | Payload | Sucesso |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | `{ nome, nomeUsuario, email, senha }` | `202` genérico com `EMAIL_VERIFICATION_REQUIRED` |
+| POST | `/api/auth/register` | `{ nome, nomeEmpresa, email, senha }` | `202` genérico com `EMAIL_VERIFICATION_REQUIRED` |
 | POST | `/api/auth/verify-email` | `{ email, codigo }` | `200` com `EMAIL_VERIFIED`; não cria sessão |
 | POST | `/api/auth/resend-verification` | `{ email }` | `202` genérico |
 | POST | `/api/auth/forgot-password` | `{ email }` | `202` genérico |
@@ -24,10 +24,14 @@ as rotas abaixo, sem mocks, e mantém a sessão/CSRF do login existente.
 Regras do contrato:
 
 - Cadastro cria o negócio e um usuário com perfil `ADMINISTRADOR`; perfil não é
-  aceito no payload.
-- E-mail e `nomeUsuario` são globalmente únicos; a resposta de cadastro não
-  revela se a conta já existia.
-- Senha: mínimo de 12 caracteres e máximo de 72 bytes.
+  aceito no payload. O payload exato não inclui `nomeUsuario`.
+- E-mail é globalmente único; a resposta de cadastro não revela se a conta já
+  existia.
+- Senha: mínimo de 8 caracteres Unicode e máximo de 72 bytes UTF-8. A lista
+  comum combinada com o Cedro é comparada de forma case-insensitive, exata e
+  sem trim: `12345678`, `123456789`, `1234567890`, `password`, `password1`,
+  `qwerty123`, `letmein`, `welcome1`, `iloveyou`, `admin123`, `senha123` e
+  `abc12345`. O login legado não aplica a regra nova.
 - OTP: exatamente 6 dígitos, validade de 10 minutos, até 5 tentativas, reenvio
   após 60 segundos e teto de 5 envios por hora por e-mail + propósito.
 - Cadastro duplicado, reenvio e pedido de recuperação respondem `202` genérico
@@ -37,8 +41,11 @@ Regras do contrato:
 - Verificação inválida, expirada, inexistente ou já verificada retorna `400`
   genérico. Cadastro, verificação e reset **não** autenticam automaticamente.
   O login é sempre explícito; o reset invalida todas as sessões.
-- Login existente continua com `{ identifier, password }`, cookie opaco
-  `HttpOnly`/`SameSite=Lax`/`Secure` em produção e `csrfToken`.
+- Login existente continua com `{ identifier, password, lembrarDeMim? }`, cookie
+  opaco `HttpOnly`/`SameSite=Lax`/`Secure` em produção e `csrfToken`.
+  `lembrarDeMim=true` mantém a sessão por 30 dias; omitido ou `false` usa o TTL
+  padrão (`SESSION_TTL_HOURS`, 12 h). O login legado aceita usuário ou e-mail e
+  não aplica a nova regra de senha.
 
 ## 2. Rotas de interface
 
@@ -49,6 +56,7 @@ Regras do contrato:
 | `/verificar-email` | OTP de 6 dígitos e reenvio com cooldown |
 | `/esqueci-senha` | Solicitação genérica de recuperação |
 | `/redefinir-senha` | OTP + nova senha |
+| `/mais/senha` | Troca de senha autenticada (fora do fluxo OTP) |
 
 Todas são públicas no `proxy.ts`. Os handlers em `app/api/auth/*` são dedicados
 e não exigem sessão; as demais rotas `/api/*` continuam usando o pass-through
@@ -62,6 +70,13 @@ autenticado com CSRF.
 - Não há auto-login após cadastro, verificação ou reset.
 - A interface valida os 6 dígitos e a senha localmente para evitar requisições
   inválidas, mas o backend é a autoridade final.
+- “Lembrar de mim” começa desmarcado e exibe aviso para uso apenas em
+  dispositivo pessoal. Quando marcado, a sessão e o cookie CSRF usam 30 dias;
+  sem a opção, usam `SESSION_TTL_HOURS` (12 h por padrão).
+- O cookie CSRF é ressincronizado no carregamento do shell a partir de
+  `csrfMaxAgeSeconds`/`expiresAt` devolvidos por `GET /api/auth/session`,
+  limitado ao tempo restante da sessão e sem renovar a sessão. Logout e troca
+  de senha limpam o cookie; a troca autenticada revoga as sessões no backend.
 - O limite de tentativas e o teto de envios são do backend; respostas de
   reenvio/recuperação são neutras inclusive em cooldown/limite. A UI mantém
   cooldown visual fixo de 60 segundos e não confirma envio.
@@ -72,18 +87,22 @@ autenticado com CSRF.
 
 ## 4. Test IDs
 
-`login-email`, `login-password`, `login-submit`, `login-forgot`,
+`login-email`, `login-password`, `login-password-toggle`, `login-remember`,
+`login-submit`, `login-forgot`,
 `login-register`, `login-verify-email`,
-`cadastro-nome`, `cadastro-usuario`, `cadastro-email`, `cadastro-senha`,
+`cadastro-nome`, `cadastro-empresa`, `cadastro-email`, `cadastro-senha`,
 `cadastro-confirmar-senha`, `cadastro-submit`,
 `verificar-email`, `verificar-codigo`, `verificar-submit`,
 `verificar-reenviar`,
 `esqueci-email`, `esqueci-submit`, `esqueci-redefinir-link`,
 `redefinir-email`, `redefinir-codigo`, `redefinir-senha`,
-`redefinir-confirmar-senha`, `redefinir-submit`.
+`redefinir-confirmar-senha`, `redefinir-submit`,
+`mais-senha`, `senha-atual`, `senha-nova`, `senha-confirmar`, `senha-submit`.
 
 Extras de navegação/estado: `verificar-ir-login`, `redefinir-ir-login`,
-`redefinir-novo-codigo`, `*-toggle` para os campos de senha.
+`redefinir-novo-codigo`, `cadastro-login-link`, `verificar-login-link`,
+`esqueci-login-link`, `redefinir-login-link`, `senha-ir-login`, `*-toggle` para
+os campos de senha.
 
 ## 5. Verificação executada
 

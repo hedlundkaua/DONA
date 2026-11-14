@@ -10,23 +10,28 @@ import { SpinnerIcon } from "@/components/ui/icons";
 import {
   EMAIL_MAX_CARACTERES,
   emailValido,
+  NOME_EMPRESA_MAX_CARACTERES,
+  NOME_EMPRESA_MIN_CARACTERES,
   NOME_MAX_CARACTERES,
-  NOME_USUARIO_MAX_CARACTERES,
-  NOME_USUARIO_MIN_CARACTERES,
-  nomeUsuarioValido,
+  nomeEmpresaValido,
   nomeValido,
   normalizarEmail,
   validarSenha,
 } from "@/lib/auth";
 import { apiFetch } from "@/lib/http";
 
-type Campo = "nome" | "nomeUsuario" | "email" | "senha" | "confirmarSenha";
+type Campo =
+  | "nome"
+  | "nomeEmpresa"
+  | "email"
+  | "senha"
+  | "confirmarSenha";
 type Erros = Partial<Record<Campo, string>>;
 
 export function CadastroForm({ avisoInicial }: { avisoInicial: string | null }) {
   const router = useRouter();
   const [nome, setNome] = useState("");
-  const [nomeUsuario, setNomeUsuario] = useState("");
+  const [nomeEmpresa, setNomeEmpresa] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -49,7 +54,7 @@ export function CadastroForm({ avisoInicial }: { avisoInicial: string | null }) 
 
     const dados = {
       nome: nome.trim(),
-      nomeUsuario: nomeUsuario.trim(),
+      nomeEmpresa: nomeEmpresa.trim(),
       email: normalizarEmail(email),
       senha,
     };
@@ -58,8 +63,8 @@ export function CadastroForm({ avisoInicial }: { avisoInicial: string | null }) 
     if (!nomeValido(dados.nome)) {
       novosErros.nome = `Informe seu nome (${NOME_MAX_CARACTERES} caracteres no máximo).`;
     }
-    if (!nomeUsuarioValido(dados.nomeUsuario)) {
-      novosErros.nomeUsuario = `Use de ${NOME_USUARIO_MIN_CARACTERES} a ${NOME_USUARIO_MAX_CARACTERES} caracteres: letras sem acento, números, ponto, sublinhado ou hífen.`;
+    if (!nomeEmpresaValido(dados.nomeEmpresa)) {
+      novosErros.nomeEmpresa = `Informe o nome da empresa (${NOME_EMPRESA_MIN_CARACTERES} a ${NOME_EMPRESA_MAX_CARACTERES} caracteres).`;
     }
     if (!emailValido(dados.email)) {
       novosErros.email = "Informe um e-mail válido.";
@@ -138,34 +143,30 @@ export function CadastroForm({ avisoInicial }: { avisoInicial: string | null }) 
         </Field>
 
         <Field
-          label="Nome de usuário"
-          htmlFor="cadastro-usuario"
+          label="Nome da empresa"
+          htmlFor="cadastro-empresa"
           required
-          hint={`${NOME_USUARIO_MIN_CARACTERES} a ${NOME_USUARIO_MAX_CARACTERES} caracteres: letras sem acento, números, ponto, sublinhado ou hífen.`}
-          error={erros.nomeUsuario}
+          hint="Como o negócio aparece no sistema."
+          error={erros.nomeEmpresa}
         >
           <input
-            id="cadastro-usuario"
-            name="nomeUsuario"
-            data-testid="cadastro-usuario"
+            id="cadastro-empresa"
+            name="nomeEmpresa"
+            data-testid="cadastro-empresa"
             type="text"
-            value={nomeUsuario}
+            value={nomeEmpresa}
             onChange={(evento) => {
-              setNomeUsuario(evento.target.value);
-              limparErro("nomeUsuario");
+              setNomeEmpresa(evento.target.value);
+              limparErro("nomeEmpresa");
             }}
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            minLength={NOME_USUARIO_MIN_CARACTERES}
-            maxLength={NOME_USUARIO_MAX_CARACTERES}
-            pattern="[A-Za-z0-9._-]{3,50}"
+            autoComplete="organization"
+            maxLength={NOME_EMPRESA_MAX_CARACTERES}
             disabled={enviando}
-            aria-invalid={Boolean(erros.nomeUsuario) || undefined}
+            aria-invalid={Boolean(erros.nomeEmpresa) || undefined}
             aria-describedby={
-              erros.nomeUsuario
-                ? "cadastro-usuario-error"
-                : "cadastro-usuario-hint"
+              erros.nomeEmpresa
+                ? "cadastro-empresa-error"
+                : "cadastro-empresa-hint"
             }
             className={inputBase}
           />
@@ -198,7 +199,7 @@ export function CadastroForm({ avisoInicial }: { avisoInicial: string | null }) 
           label="Senha"
           htmlFor="cadastro-senha"
           required
-          hint="Pelo menos 12 caracteres."
+          hint="Pelo menos 8 caracteres. Evite senhas comuns."
           error={erros.senha}
         >
           <PasswordInput

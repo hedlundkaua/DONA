@@ -36,6 +36,7 @@ enum FinalidadeOtp {
 
 model Negocio {
   id          String       @id @default(uuid()) @db.Uuid
+  nomeEmpresa String?      @map("nome_empresa") @db.VarChar(150)
   status      StatusNegocio @default(ATIVO)
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   usuarios    Usuario[]

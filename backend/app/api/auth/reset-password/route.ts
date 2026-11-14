@@ -6,6 +6,7 @@ import { createAudit } from "@/lib/auth";
 import { consumeOtp, normalizeEmail } from "@/lib/otp";
 import { prisma } from "@/lib/prisma";
 import { isValidEmail, parseJsonObject } from "@/lib/validators";
+import { isValidNewPassword } from "@/lib/password-policy";
 
 const invalidCode = () => NextResponse.json({ success: false, error: "Código inválido ou expirado." }, { status: 400 });
 export async function POST(req: NextRequest) {
@@ -14,8 +15,8 @@ export async function POST(req: NextRequest) {
     const email = typeof body?.email === "string" ? normalizeEmail(body.email) : "";
     if (!body || Object.keys(body).sort().join(",") !== "codigo,email,novaSenha" || !isValidEmail(email)
       || typeof body.codigo !== "string" || !/^\d{6}$/.test(body.codigo)
-      || typeof body.novaSenha !== "string" || body.novaSenha.length < 12 || Buffer.byteLength(body.novaSenha, "utf8") > 72) {
-      return NextResponse.json({ success: false, error: "Informe e-mail, código válido e nova senha com ao menos 12 caracteres." }, { status: 400 });
+      || !isValidNewPassword(body.novaSenha)) {
+      return NextResponse.json({ success: false, error: "Informe e-mail, código válido e nova senha com no mínimo 8 caracteres Unicode e no máximo 72 bytes UTF-8." }, { status: 400 });
     }
     const user = await prisma.usuario.findUnique({ where: { email }, include: { negocio: true } });
     if (!user || !user.ativo || user.negocio.status !== StatusNegocio.ATIVO) return invalidCode();

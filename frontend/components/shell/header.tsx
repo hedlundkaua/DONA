@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
 import { Logo } from "./logo";
 import {
   ArrowLeftIcon,
@@ -27,6 +27,12 @@ export function Header({ nome }: { nome: string }) {
   const router = useRouter();
   const [saindo, iniciarSaida] = useTransition();
   const mostrarVoltar = !ROTAS_RAIZ.has(pathname);
+
+  // Mantém o cookie CSRF sincronizado com a duração real da sessão. Em uma
+  // sessão "lembrar de mim" (30 dias), o cookie não pode expirar em 12h.
+  useEffect(() => {
+    void fetch("/api/auth/me", { cache: "no-store" }).catch(() => {});
+  }, []);
 
   async function sair() {
     iniciarSaida(async () => {

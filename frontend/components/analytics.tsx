@@ -6,7 +6,8 @@ const paginas = new Set([
   "/", "/login", "/cadastro", "/verificar-email", "/esqueci-senha",
   "/redefinir-senha", "/produtos", "/produtos/novo", "/categorias",
   "/clientes", "/clientes/novo", "/vendas", "/vendas/nova", "/mais",
-  "/movimentos", "/movimentos/novo", "/ajustes", "/ajustes/novo",
+  "/mais/senha", "/movimentos", "/movimentos/novo", "/ajustes",
+  "/ajustes/novo",
 ]);
 
 function sanitizarEvento(evento: BeforeSendEvent): BeforeSendEvent | null {

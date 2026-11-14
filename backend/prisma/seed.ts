@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { FinalidadeOtp, PerfilUsuario, PrismaClient, StatusNegocio } from "@prisma/client";
 import { issueOtp } from "../lib/otp";
 import { emailProviderConfigured } from "../lib/auth-email";
+import { isValidNewPassword } from "../lib/password-policy";
 
 const prisma = new PrismaClient();
 
@@ -12,7 +13,7 @@ async function main() {
   const email = process.env.DEV_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.DEV_ADMIN_PASSWORD;
   if (!nome || !nomeUsuario || !email || !password) throw new Error("Defina DEV_ADMIN_NAME, DEV_ADMIN_USERNAME, DEV_ADMIN_EMAIL e DEV_ADMIN_PASSWORD no processo.");
-  if (nome.length > 150 || !/^[a-z0-9._-]{3,50}$/.test(nomeUsuario) || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || Buffer.byteLength(password, "utf8") > 72) throw new Error("Credenciais DEV_ADMIN inválidas.");
+  if (nome.length > 150 || !/^[a-z0-9._-]{3,50}$/.test(nomeUsuario) || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !isValidNewPassword(password)) throw new Error("Invalid development credentials.");
   if (!emailProviderConfigured()) throw new Error("Email provider not configured; no database changes made.");
   if (await prisma.usuario.count() !== 0) throw new Error("Seed recusado em banco com usuários; não atualiza contas/dados existentes.");
 

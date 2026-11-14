@@ -7,8 +7,8 @@ DONA, sem dados fictícios ou mocks na aplicação.
 Os módulos de **Clientes** e **Vendas** estão integrados ao contrato congelado
 do backend: listas, cadastro, edição, venda com múltiplos itens e detalhe usam
 as rotas reais. O fluxo público de **cadastro, verificação de e-mail por OTP,
-recuperação e redefinição de senha** segue o contrato provisório de
-autenticação/multi-tenant informado pelo Cedro; a integração real depende da
+recuperação e redefinição de senha** segue o contrato de
+autenticação/multi-tenant confirmado pelo Cedro; a integração real depende da
 publicação desses endpoints. O contrato de referência do backend está em
 `backend/docs/clientes-vendas.md`; o mapeamento de telas e as decisões de
 frontend estão em `docs/contrato-clientes-vendas.md` e
@@ -63,18 +63,25 @@ backend.
 O frontend foi implementado contra o contrato de autenticação atual do
 backend (`backend/lib/auth.ts` e `backend/app/api/auth/*`):
 
-- `POST /api/auth/login` com `{ identifier, password }` (usuário **ou** e-mail);
-- resposta `{ success: true, data: { user, csrfToken } }` + cookie de sessão;
+- `POST /api/auth/login` com `{ identifier, password, lembrarDeMim? }`; `identifier`
+  aceita e-mail e, para contas legadas, o usuário. `lembrarDeMim` é booleano e,
+  quando `true`, mantém a sessão por 30 dias; quando omitido ou `false`, usa
+  `SESSION_TTL_HOURS` (padrão 12 h);
+- resposta `{ success: true, data: { user, csrfToken, csrfMaxAgeSeconds, expiresAt } }`
+  + cookie de sessão;
 - cookie `dona_session` em desenvolvimento e `__Host-dona_session` em produção,
   `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` em produção e TTL configurável
-  por `SESSION_TTL_HOURS` (1–168 h; padrão 12 h);
-- `GET /api/auth/session` valida a sessão e devolve usuário + `csrfToken`;
+  por `SESSION_TTL_HOURS` (1–168 h; padrão 12 h) ou 30 dias com `lembrarDeMim`;
+- `GET /api/auth/session` valida a sessão e devolve usuário + `csrfToken`,
+  `csrfMaxAgeSeconds`/`expiresAt`; o frontend ressincroniza o cookie CSRF com a
+  validade efetiva da sessão no carregamento do shell;
 - `POST /api/auth/session` revoga a sessão (logout);
 - mutações exigem o header `X-CSRF-Token`; o frontend mantém o token apenas em
   memória e o proxy o injeta a partir do cookie httpOnly;
 - `POST /api/auth/password` troca a senha autenticada e revoga todas as sessões;
 - `POST /api/auth/register` cria o negócio e o acesso de administração, sem
-  sessão, com resposta `202` genérica;
+  sessão, com payload exato `{ nome, nomeEmpresa, email, senha }` e resposta
+  `202` genérica;
 - `POST /api/auth/verify-email` e `POST /api/auth/resend-verification` validam
   ou reenviam o OTP de 6 dígitos;
 - `POST /api/auth/forgot-password` e `POST /api/auth/reset-password` iniciam e
@@ -94,8 +101,10 @@ backend (`backend/lib/auth.ts` e `backend/app/api/auth/*`):
 backend `DATABASE_URL`, `SESSION_SECRET` (32+ bytes), `NODE_ENV=development` e
 `DEV_ADMIN_NAME`, `DEV_ADMIN_USERNAME`, `DEV_ADMIN_EMAIL` e
 `DEV_ADMIN_PASSWORD`; depois rode `npm run db:seed`. O seed também cria dados
-demonstrativos de produtos/categorias, exige senha de 12+ caracteres (até 72
-bytes) e, se a conta já existir, atualiza a senha e revoga suas sessões.
+demonstrativos de produtos/categorias e usa uma regra própria do backend
+(atualmente 12+ caracteres, até 72 bytes); a UI pública valida 8+ caracteres e
+a lista de senhas comuns. Se a conta já existir, o seed atualiza a senha e
+revoga suas sessões.
 
 Para uma instalação vazia (inclusive produção), configure temporariamente
 `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_EMAIL` e
@@ -131,7 +140,13 @@ Navegador ──(cookie httpOnly)──► Next.js (3001)
 - `proxy.ts` (convenção do Next 16) protege a navegação: sem cookie de sessão,
   redireciona para `/login?next=...`. A validade real é conferida pelo backend.
 - O token CSRF é guardado em `dona_csrf` (httpOnly). O navegador não precisa
-  (e não consegue) lê-lo.
+  (e não consegue) lê-lo. A validade do cookie acompanha a sessão: 12 h por
+  padrão e 30 dias com `lembrarDeMim`; no carregamento do shell, `/api/auth/me`
+  ressincroniza o cookie com `csrfMaxAgeSeconds`/`expiresAt` devolvidos pelo
+  backend, limitado ao tempo restante da sessão e sem renovar a sessão. Logout
+  e troca de senha limpam o cookie.
+- O login mantém a opção “Lembrar de mim” desmarcada e alerta que ela só deve
+  ser usada em dispositivo pessoal.
 
 ## Contrato consumido
 
@@ -141,6 +156,7 @@ IDs são numéricos. Decimais chegam como string (Prisma).
 | Tela | Endpoints |
 | --- | --- |
 | Entrar | `POST /api/auth/login`, `GET /api/auth/session` |
+| Alterar senha | `POST /api/auth/password` |
 | Criar conta | `POST /api/auth/register` |
 | Verificar e-mail | `POST /api/auth/verify-email`, `POST /api/auth/resend-verification` |
 | Esqueci a senha | `POST /api/auth/forgot-password` |
@@ -157,22 +173,27 @@ IDs são numéricos. Decimais chegam como string (Prisma).
 
 Decisões de interface alinhadas ao contrato atual:
 
-- O cadastro envia exatamente `nome`, `nomeUsuario`, `email` e `senha`; não há
-  campo de perfil, tenant ou confirmação de senha no payload. A confirmação é
-  apenas validação local. Resposta e próxima tela são genéricas para não
-  revelar se a conta já existia.
+- O cadastro envia exatamente `nome`, `nomeEmpresa`, `email` e `senha`; não há
+  campo de perfil, tenant, `nomeUsuario` ou confirmação de senha no payload. A
+  confirmação é apenas validação local. Resposta e próxima tela são genéricas
+  para não revelar se a conta já existia.
 - A validação local acompanha o backend: `nome` de 2 a 150 caracteres,
-  `nomeUsuario` com 3 a 50 caracteres no padrão `[A-Za-z0-9._-]` e `email` com
-  até 254 caracteres, sem pontos inicial/final/consecutivos na parte local ou
-  no domínio. O payload continua com os mesmos quatro campos.
+  `nomeEmpresa` de 2 a 150 caracteres e `email` com até 254 caracteres, sem
+  pontos inicial/final/consecutivos na parte local ou no domínio. O payload
+  continua com os mesmos quatro campos.
 - OTP tem exatamente 6 dígitos, validade de 10 minutos, até 5 tentativas e
   reenvio após 60 segundos; o limite de 5 envios por hora é aplicado pelo
   backend. Cadastro duplicado, reenvio e recuperação respondem de forma
   genérica inclusive em cooldown/limite; a interface mantém cooldown visual de
   60 segundos e não confirma que um envio ocorreu.
 - Cadastro, verificação e redefinição não autenticam automaticamente. A senha
-  tem no mínimo 12 caracteres e no máximo 72 bytes; a validação de bytes é
-  local e o backend continua sendo a autoridade final.
+  tem no mínimo 8 caracteres Unicode e no máximo 72 bytes UTF-8. A lista comum
+  combinada com o Cedro é comparada de forma case-insensitive, exata e sem
+  trim: `12345678`, `123456789`, `1234567890`, `password`, `password1`,
+  `qwerty123`, `letmein`, `welcome1`, `iloveyou`, `admin123`, `senha123` e
+  `abc12345`. A mesma regra vale em cadastro, redefinição e troca autenticada;
+  o login legado não aplica a regra nova. O backend continua sendo a autoridade
+  final.
 - Nenhum OTP ou senha é colocado em URL, query, log ou mensagem de erro. As
   rotas públicas de autenticação usam handlers dedicados, sem sessão e sem
   repassar cookies; as demais rotas `/api/*` continuam exigindo sessão e CSRF.
@@ -230,7 +251,7 @@ Instagram ou outros campos.
 
 | Rota | Descrição |
 | --- | --- |
-| `/login` | Entrada (usuário ou e-mail + senha) e links de cadastro/recuperação |
+| `/login` | Entrada por e-mail (ou usuário legado) + senha, com opção “lembrar de mim” |
 | `/cadastro` | Cadastro público do negócio e do acesso de administração |
 | `/verificar-email` | Verificação do e-mail por OTP e reenvio do código |
 | `/esqueci-senha` | Solicitação genérica de recuperação por e-mail |
@@ -245,7 +266,8 @@ Instagram ou outros campos.
 | `/movimentos/novo` | Entrada ou saída |
 | `/ajustes` | Histórico de ajustes (administração/estoquista) |
 | `/ajustes/novo` | Contagem e diferença (administração/estoquista) |
-| `/mais` | Atalhos para Categorias, Movimentos e Ajustes |
+| `/mais` | Atalhos para Categorias, Movimentos, Ajustes e Alterar senha |
+| `/mais/senha` | Troca de senha autenticada, com revogação das outras sessões |
 | `/clientes` | Lista real com busca, filtro de situação e atalho de edição |
 | `/clientes/novo` | Cadastro real (administração/gestão) |
 | `/clientes/[id]/editar` | Edição e ativação/inativação (administração/gestão) |
@@ -288,12 +310,13 @@ Solicitados pela Íris para os testes de integração:
 | `login-email` | Campo usuário/e-mail |
 | `login-password` | Campo senha |
 | `login-password-toggle` | Botão mostrar/ocultar senha do login |
+| `login-remember` | Checkbox “Lembrar de mim” (desmarcado por padrão) |
 | `login-submit` | Botão entrar |
 | `login-forgot` | Link “Esqueci minha senha” |
 | `login-register` | Link “Criar conta” |
 | `login-verify-email` | Link para reenviar verificação de e-mail |
 | `cadastro-nome` | Campo nome |
-| `cadastro-usuario` | Campo nome de usuário |
+| `cadastro-empresa` | Campo nome da empresa |
 | `cadastro-email` | Campo e-mail |
 | `cadastro-senha` | Campo senha |
 | `cadastro-senha-toggle` | Botão mostrar/ocultar senha do cadastro |
@@ -321,6 +344,12 @@ Solicitados pela Íris para os testes de integração:
 | `redefinir-ir-login` | Botão “Ir para o login” após redefinição |
 | `redefinir-login-link` | Link para o login no rodapé da redefinição |
 | `redefinir-novo-codigo` | Link para solicitar outro código |
+| `mais-senha` | Link “Alterar senha” na tela Mais |
+| `senha-atual` | Campo senha atual |
+| `senha-nova` | Campo nova senha |
+| `senha-confirmar` | Campo confirmação da nova senha |
+| `senha-submit` | Botão alterar senha |
+| `senha-ir-login` | Botão “Ir para o login” após troca de senha |
 | `produto-nome` | Campo nome do produto |
 | `produto-categoria` | Select de categoria |
 | `produto-salvar` | Botão salvar produto |
@@ -444,8 +473,10 @@ desenvolvimento ou envio de e-mail real.
 ## Limitações conhecidas
 
 - Sem tela de gestão de usuários; o cadastro público cria o negócio e o acesso
-  de administração, mas a integração real depende do backend. Troca de senha
-  autenticada continua sem tela (o backend expõe `POST /api/auth/password`).
+  de administração, mas a integração real depende do backend.
+- A troca de senha autenticada está em `/mais/senha` e usa
+  `POST /api/auth/password`; o backend ainda precisa confirmar a mesma regra de
+  senha e a revogação de sessões no ambiente integrado.
 - A recuperação por OTP está implementada no frontend, mas ainda não foi
   validada contra o backend real. Testes de e-mail devem usar o harness
   isolado/Ethereal; o Resend live não é usado nesta etapa.

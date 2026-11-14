@@ -8,7 +8,13 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await requireUser(req, Object.values(PerfilUsuario));
     if (!auth.ok) return auth.response;
-    return NextResponse.json({ success: true, data: { user: auth.user, csrfToken: auth.csrfToken } });
+    const remainingSeconds = Math.max(0, Math.ceil((auth.sessionExpiresAt.getTime() - Date.now()) / 1000));
+    return NextResponse.json({ success: true, data: {
+      user: auth.user,
+      csrfToken: auth.csrfToken,
+      expiresAt: auth.sessionExpiresAt.toISOString(),
+      csrfMaxAgeSeconds: remainingSeconds,
+    } });
   } catch (err) { return serverError(err); }
 }
 

@@ -4,18 +4,36 @@
  * desnecessárias ao servidor e mantemos as mensagens públicas genéricas.
  */
 
-export const SENHA_MIN_CARACTERES = 12;
+export const SENHA_MIN_CARACTERES = 8;
 export const SENHA_MAX_BYTES = 72;
 export const NOME_MIN_CARACTERES = 2;
 export const NOME_MAX_CARACTERES = 150;
-export const NOME_USUARIO_MIN_CARACTERES = 3;
-export const NOME_USUARIO_MAX_CARACTERES = 50;
-export const NOME_USUARIO_REGEX = /^[A-Za-z0-9._-]{3,50}$/;
+export const NOME_EMPRESA_MIN_CARACTERES = 1;
+export const NOME_EMPRESA_MAX_CARACTERES = 150;
 export const EMAIL_MAX_CARACTERES = 254;
 export const OTP_DIGITOS = 6;
 export const OTP_VALIDADE_MINUTOS = 10;
 export const OTP_MAX_TENTATIVAS = 5;
 export const OTP_REENVIO_SEGUNDOS = 60;
+
+/**
+ * Lista curta combinada com o Cedro. A comparação é exata, sem trim, e
+ * case-insensitive; senhas legadas não passam por esta regra no login.
+ */
+export const SENHAS_COMUNS = new Set([
+  "12345678",
+  "123456789",
+  "1234567890",
+  "password",
+  "password1",
+  "qwerty123",
+  "letmein",
+  "welcome1",
+  "iloveyou",
+  "admin123",
+  "senha123",
+  "abc12345",
+]);
 
 export const MENSAGEM_CADASTRO_GENERICA =
   "Se o cadastro puder ser processado, enviaremos instruções para verificar o e-mail.";
@@ -65,8 +83,12 @@ export function nomeValido(nome: string): boolean {
   );
 }
 
-export function nomeUsuarioValido(nomeUsuario: string): boolean {
-  return NOME_USUARIO_REGEX.test(nomeUsuario.trim());
+export function nomeEmpresaValido(nomeEmpresa: string): boolean {
+  const valor = nomeEmpresa.trim();
+  return (
+    valor.length >= NOME_EMPRESA_MIN_CARACTERES &&
+    valor.length <= NOME_EMPRESA_MAX_CARACTERES
+  );
 }
 
 export function validarSenha(senha: string): string | null {
@@ -76,6 +98,10 @@ export function validarSenha(senha: string): string | null {
 
   if (new TextEncoder().encode(senha).length > SENHA_MAX_BYTES) {
     return `A senha pode ter no máximo ${SENHA_MAX_BYTES} bytes.`;
+  }
+
+  if (SENHAS_COMUNS.has(senha.toLowerCase())) {
+    return "Essa senha é muito comum. Escolha outra.";
   }
 
   return null;

@@ -183,7 +183,7 @@ export function RedefinirSenhaForm({ emailInicial }: { emailInicial: string }) {
           label="Nova senha"
           htmlFor="redefinir-senha"
           required
-          hint="Pelo menos 12 caracteres."
+          hint="Pelo menos 8 caracteres. Evite senhas comuns."
           error={erros.novaSenha}
         >
           <PasswordInput
