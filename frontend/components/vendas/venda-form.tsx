@@ -143,10 +143,8 @@ export function VendaForm({
       ? "PAGO"
       : "A_PRAZO";
 
-  const exigeData =
-    statusPagamento === "A_PRAZO" && (ehCredito || !ehCartao);
-  const dataEfetiva =
-    statusPagamento === "A_PRAZO" && exigeData ? primeiroVencimento : dataPedido;
+  const exigeData = statusPagamento === "A_PRAZO";
+  const dataEfetiva = exigeData ? primeiroVencimento : dataPedido;
 
   function descricao(id: string, dica?: string) {
     if (erros[id]) return `${id}-error`;
