@@ -16,13 +16,20 @@ const ROTAS_RAIZ = new Set([
   "/produtos",
   "/vendas",
   "/clientes",
+  "/financeiro",
   "/mais",
   "/categorias",
   "/movimentos",
   "/ajustes",
 ]);
 
-export function Header({ nome }: { nome: string }) {
+export function Header({
+  nome,
+  nomeEmpresa,
+}: {
+  nome: string;
+  nomeEmpresa?: string | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [saindo, iniciarSaida] = useTransition();
@@ -69,7 +76,7 @@ export function Header({ nome }: { nome: string }) {
               DONA
             </span>
             <span className="block truncate text-[11px] text-muted">
-              Empreendedoras Restinga
+              {nomeEmpresa?.trim() || "Gestão do seu negócio"}
             </span>
           </span>
         </Link>
@@ -95,11 +102,15 @@ export function Header({ nome }: { nome: string }) {
               </li>
               <li>
                 <strong className="text-navy">Clientes:</strong> consulte e
-                atualize os contatos da cooperativa.
+                atualize os contatos do negócio.
               </li>
               <li>
                 <strong className="text-navy">Mais:</strong> categorias,
-                movimentos e ajustes de estoque.
+                movimentos, ajustes e seus dados.
+              </li>
+              <li>
+                <strong className="text-navy">Financeiro:</strong> parcelas,
+                caixa e relatórios (quando liberado para o seu perfil).
               </li>
             </ul>
             <p className="mt-3 truncate border-t border-line pt-3 text-xs text-muted">

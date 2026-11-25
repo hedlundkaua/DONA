@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     });
 
     const filtered = estoqueBaixo === "true"
-      ? produtos.filter((produto) => produto.ativo && produto.quantidadeEstoque.lessThanOrEqualTo(produto.estoqueMinimo))
+      ? produtos.filter((produto) => produto.ativo && produto.quantidadeEstoque.lessThan(produto.estoqueMinimo))
       : produtos;
     return ok(auth.user.perfil === PerfilUsuario.VENDEDOR
       ? filtered.map(({ precoCusto: _privateCost, ...produto }) => produto)

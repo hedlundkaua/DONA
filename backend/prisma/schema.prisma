@@ -30,6 +30,7 @@ enum StatusNegocio {
 enum FinalidadeOtp {
   VERIFICAR_EMAIL
   RECUPERAR_SENHA
+  ALTERAR_EMAIL
 
   @@map("finalidade_otp")
 }
@@ -50,6 +51,7 @@ model Negocio {
   vendas      Venda[]
   itensVenda  ItemVenda[]
   codigosOtp  CodigoOtp[]
+  taxasCartao TaxaCartao[]
   categoriasLegacy CategoriaNomeLegacy[]
 
   @@map("negocios")
@@ -73,6 +75,7 @@ model Usuario {
   auditorias  AuditoriaUsuario[] @relation("AuditActor")
   alvos       AuditoriaUsuario[] @relation("AuditTarget")
   vendas      Venda[]
+  lancamentos LancamentoFinanceiro[]
   clientesCriados Cliente[] @relation("ClienteCriadoPor")
   clientesAtualizados Cliente[] @relation("ClienteAtualizadoPor")
   negocio     Negocio       @relation(fields: [negocioId], references: [id], onDelete: Restrict)
@@ -200,6 +203,14 @@ model Venda {
   vencimento    DateTime?    @db.Date
   observacoes   String?      @db.VarChar(1000)
   total         Decimal      @db.Decimal(12, 2)
+  forma FormaPagamento?
+  bandeira String? @db.VarChar(50)
+  modalidade ModalidadeCartao?
+  numeroParcelas Int? @map("numero_parcelas")
+  percentual Decimal? @db.Decimal(5,2)
+  taxa Decimal? @db.Decimal(12,2)
+  liquido Decimal? @db.Decimal(12,2)
+  parcelas ParcelaVenda[]
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   negocio       Negocio      @relation(fields: [negocioId], references: [id], onDelete: Restrict)
   cliente       Cliente      @relation(fields: [negocioId, clienteId], references: [negocioId, id], onDelete: Restrict)
@@ -405,4 +416,66 @@ model LimiteEnvioOtp {
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("limites_envio_otp")
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  PIX
+  CARTAO
+  @@map("forma_pagamento")
+}
+
+enum ModalidadeCartao {
+  DEBITO
+  CREDITO
+  @@map("modalidade_cartao")
+}
+
+enum TipoLancamento {
+  ENTRADA
+  SAIDA
+  @@map("tipo_lancamento")
+}
+
+model TaxaCartao {
+  negocioId String @map("negocio_id") @db.Uuid
+  bandeira String @db.VarChar(50)
+  modalidade ModalidadeCartao
+  parcelas Int
+  percentual Decimal @db.Decimal(5,2)
+  negocio Negocio @relation(fields:[negocioId], references:[id], onDelete:Restrict)
+  @@id([negocioId,bandeira,modalidade,parcelas])
+  @@map("taxas_cartao")
+}
+
+model ParcelaVenda {
+  id Int @id @default(autoincrement())
+  negocioId String @map("negocio_id") @db.Uuid
+  vendaId Int @map("venda_id")
+  numero Int
+  vencimento DateTime @db.Date
+  valor Decimal @db.Decimal(12,2)
+  recebidoEm DateTime? @map("recebido_em") @db.Date
+  venda Venda @relation(fields:[negocioId,vendaId],references:[negocioId,id],onDelete:Restrict)
+  lancamento LancamentoFinanceiro?
+  @@unique([negocioId,id])
+  @@unique([negocioId,vendaId,numero])
+  @@index([negocioId,vencimento])
+  @@map("parcelas_venda")
+}
+
+model LancamentoFinanceiro {
+  id Int @id @default(autoincrement())
+  negocioId String @map("negocio_id") @db.Uuid
+  usuarioId Int @map("usuario_id")
+  parcelaId Int? @map("parcela_id")
+  tipo TipoLancamento
+  data DateTime @db.Date
+  descricao String @db.VarChar(255)
+  valor Decimal @db.Decimal(12,2)
+  usuario Usuario @relation(fields:[negocioId,usuarioId],references:[negocioId,id],onDelete:Restrict)
+  parcela ParcelaVenda? @relation(fields:[negocioId,parcelaId],references:[negocioId,id],onDelete:Restrict)
+  @@unique([negocioId,parcelaId])
+  @@index([negocioId,data])
+  @@map("lancamentos_financeiros")
 }

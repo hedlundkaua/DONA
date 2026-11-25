@@ -15,12 +15,16 @@ import type { SessionUser } from "@/lib/session";
 export function LoginForm({
   destino,
   avisoInicial,
+  mensagemInicial = null,
+  identificadorInicial = "",
 }: {
   destino: string;
   avisoInicial: string | null;
+  mensagemInicial?: string | null;
+  identificadorInicial?: string;
 }) {
   const router = useRouter();
-  const [identificador, setIdentificador] = useState("");
+  const [identificador, setIdentificador] = useState(identificadorInicial);
   const [senha, setSenha] = useState("");
   const [lembrarDeMim, setLembrarDeMim] = useState(false);
   const [erro, setErro] = useState<string | null>(avisoInicial);
@@ -61,6 +65,12 @@ export function LoginForm({
 
   return (
     <form onSubmit={enviar} noValidate className="mt-4">
+      {mensagemInicial ? (
+        <InlineAlert tom="sucesso" className="mb-4">
+          {mensagemInicial}
+        </InlineAlert>
+      ) : null}
+
       {erro ? (
         <InlineAlert tom="erro" className="mb-4">
           {erro}

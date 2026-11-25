@@ -70,7 +70,7 @@ export default async function VendasPage({
     <PageTitle
       sobretitulo="Vendas / Histórico"
       titulo="Vendas"
-      descricao="Acompanhe as vendas da cooperativa e registre novos pedidos."
+      descricao="Acompanhe as vendas do negócio e registre novos pedidos."
       acao={
         podeCriar ? (
           <ButtonLink href="/vendas/nova" tamanho="sm">

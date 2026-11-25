@@ -6,6 +6,8 @@ import { badRequest, created, notFound, serverError, unprocessable } from "@/lib
 import { parseDateFilter, isValidDateInput, parseId, parseJsonObject } from "@/lib/validators";
 import { prisma } from "@/lib/prisma";
 
+import { calcularPagamento, lerPagamento, PagamentoInvalido, receberParcela, totaisPagamento } from "@/lib/venda-pagamento";
+
 const readRoles = Object.values(PerfilUsuario);
 const createRoles = [PerfilUsuario.ADMINISTRADOR, PerfilUsuario.GESTOR, PerfilUsuario.ESTOQUISTA, PerfilUsuario.VENDEDOR];
 const statuses = Object.values(StatusPagamentoVenda);
@@ -16,7 +18,7 @@ const vendaInclude = {
   itens: { include: itemInclude, orderBy: { id: "asc" as const } },
 } as const;
 function serializeVenda(venda: any) {
-  return { ...venda, total: venda.total.toFixed(2), itens: venda.itens.map((item: any) => ({ ...item, valorUnitario: item.valorUnitario.toFixed(2), subtotal: item.subtotal.toFixed(2) })) };
+  return { ...venda, ...totaisPagamento(venda), total: venda.total.toFixed(2), itens: venda.itens.map((item: any) => ({ ...item, valorUnitario: item.valorUnitario.toFixed(2), subtotal: item.subtotal.toFixed(2) })) };
 }
 
 type InputItem = { produtoId: number; quantidade: number };
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
     const auth = await requireUser(req, createRoles);
     if (!auth.ok) return auth.response;
     const body = await parseJsonObject(req);
-    if (!body || !integer(body.clienteId) || !statuses.includes(body.statusPagamento)) return badRequest("Informe clienteId e statusPagamento PAGO ou A_PRAZO.");
+    if (!body || !integer(body.clienteId) || (body.pagamento === undefined && !statuses.includes(body.statusPagamento)) || (body.statusPagamento !== undefined && !statuses.includes(body.statusPagamento))) return badRequest("Informe clienteId e statusPagamento PAGO ou A_PRAZO.");
     if (["total", "desconto", "valorUnitario"].some((field) => Object.hasOwn(body, field))) return badRequest("Preço e total são obtidos do cadastro ativo do produto; desconto não está disponível neste contrato.");
     if (!Array.isArray(body.itens) || body.itens.length < 1 || body.itens.length > 100) return badRequest("itens deve conter de 1 a 100 produtos.");
     const items: InputItem[] = [];
@@ -73,8 +75,14 @@ export async function POST(req: NextRequest) {
     }
     const dataPedido = body.dataPedido === undefined ? new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z") : parseDate(body.dataPedido);
     if (!dataPedido) return badRequest("dataPedido inválida; use YYYY-MM-DD.");
-    const prazo = body.statusPagamento === StatusPagamentoVenda.A_PRAZO;
-    const vencimento = body.vencimento === undefined || body.vencimento === null ? null : parseDate(body.vencimento);
+    const pagamento = body.pagamento === undefined ? null : lerPagamento(body.pagamento, dataPedido);
+    const statusPagamento = pagamento ? (pagamento.recebido ? StatusPagamentoVenda.PAGO : StatusPagamentoVenda.A_PRAZO) : body.statusPagamento as StatusPagamentoVenda;
+    if (pagamento && body.statusPagamento !== undefined && body.statusPagamento !== statusPagamento)
+      return badRequest("Status e confirmação de recebimento incompatíveis.");
+    const prazo = statusPagamento === StatusPagamentoVenda.A_PRAZO;
+    const vencimento = body.vencimento == null ? (prazo && pagamento ? pagamento.primeiroVencimento : null) : parseDate(body.vencimento);
+    if (pagamento && prazo && vencimento && +vencimento !== +pagamento.primeiroVencimento)
+      return badRequest("O vencimento deve coincidir com a primeira parcela.");
     if (prazo && !vencimento) return badRequest("vencimento é obrigatório para venda A_PRAZO e deve usar YYYY-MM-DD.");
     if (!prazo && body.vencimento !== undefined && body.vencimento !== null) return badRequest("vencimento deve ser omitido para venda PAGO.");
     if (vencimento && compareDates(vencimento, dataPedido) < 0) return badRequest("vencimento não pode ser anterior a dataPedido.");
@@ -107,9 +115,10 @@ export async function POST(req: NextRequest) {
         const changed = await tx.produto.updateMany({ where: { id: item.produtoId, negocioId: auth.user.negocioId, ativo: true, quantidadeEstoque: { gte: new Prisma.Decimal(item.quantidade) } }, data: { quantidadeEstoque: { decrement: new Prisma.Decimal(item.quantidade) } } });
         if (changed.count !== 1) throw new Error("INSUFFICIENT_STOCK");
       }
+      const valores = pagamento ? await calcularPagamento(tx, auth.user.negocioId, pagamento, total) : null;
       const venda = await tx.venda.create({ data: {
         negocioId: auth.user.negocioId, clienteId: cliente.id, usuarioId: auth.user.id, dataPedido,
-        statusPagamento: body.statusPagamento as StatusPagamentoVenda,
+        statusPagamento, ...valores?.snapshot,
         vencimento, observacoes: body.observacoes?.trim() || null, total,
         itens: { create: priced.map((item) => ({ ...item })) },
       }, include: vendaInclude });
@@ -118,10 +127,19 @@ export async function POST(req: NextRequest) {
         quantidade: new Prisma.Decimal(item.quantidade), operadorId: auth.user.id,
         vendaId: venda.id, documentoOrigem: `Venda ${venda.id}`, observacoes: `Baixa gerada pela venda ${venda.id}`,
       })) });
+      if (valores) {
+        await tx.parcelaVenda.createMany({ data: valores.parcelas.map(parcela => ({ ...parcela, negocioId: auth.user.negocioId, vendaId: venda.id })) });
+        if (pagamento?.recebido) {
+          const parcela = await tx.parcelaVenda.findFirstOrThrow({where:{negocioId:auth.user.negocioId,vendaId:venda.id,numero:1},select:{id:true}});
+          const hoje = new Date(new Date().toISOString().slice(0,10) + "T00:00:00.000Z");
+          await receberParcela(tx, auth.user.negocioId, auth.user.id, parcela.id, hoje);
+        }
+      }
       return venda;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 20_000 });
     return created(serializeVenda(result));
   } catch (err) {
+    if (err instanceof PagamentoInvalido) return unprocessable(err.message);
     if (err instanceof Error) {
       if (err.message === "CLIENT_NOT_FOUND" || err.message === "PRODUCT_NOT_FOUND") return notFound(err.message === "CLIENT_NOT_FOUND" ? "Cliente" : "Produto");
       if (err.message === "INSUFFICIENT_STOCK") return unprocessable("Saldo insuficiente para concluir a venda.");

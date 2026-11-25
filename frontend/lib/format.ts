@@ -58,6 +58,26 @@ export function hojeISO(): string {
   }).format(new Date());
 }
 
+/** Primeiro dia do mês corrente no fuso do negócio (YYYY-MM-01). */
+export function inicioMesISO(): string {
+  return `${hojeISO().slice(0, 8)}01`;
+}
+
+/**
+ * Soma meses a uma data de calendário (YYYY-MM-DD) sem deslocamento de fuso.
+ * Se o dia não existir no mês destino, usa o último dia daquele mês.
+ */
+export function somarMeses(iso: string, meses: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const [ano, mes, dia] = iso.split("-").map(Number);
+  const destino = new Date(Date.UTC(ano, mes - 1 + meses, 1));
+  const ultimoDia = new Date(
+    Date.UTC(destino.getUTCFullYear(), destino.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  destino.setUTCDate(Math.min(dia, ultimoDia));
+  return destino.toISOString().slice(0, 10);
+}
+
 /** Converte texto digitado ("1.234,56" ou "1234.56") em número. */
 export function parseDecimal(value: string, casas = 2): number | null {
   const limpo = value.replace(/R\$\s?/g, "").trim();
@@ -74,8 +94,7 @@ export function parseDecimal(value: string, casas = 2): number | null {
 export function statusEstoque(produto: Pick<Produto, "quantidadeEstoque" | "estoqueMinimo">): NivelEstoque {
   const saldo = Number(produto.quantidadeEstoque ?? 0);
   const minimo = Number(produto.estoqueMinimo ?? 0);
-  if (saldo <= 0) return "critico";
-  if (saldo <= minimo) return "baixo";
+  if (saldo < minimo) return saldo <= 0 ? "critico" : "baixo";
   return "normal";
 }
 

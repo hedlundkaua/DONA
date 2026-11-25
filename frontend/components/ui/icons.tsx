@@ -197,3 +197,51 @@ export function SpinnerIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function WalletIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 18.5v-11Z" />
+      <path d="M4 8h13" />
+      <path d="M16 12h4v4h-4a2 2 0 0 1 0-4Z" />
+    </svg>
+  );
+}
+
+export function UserIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.5 20c0-3.6 3.2-6 7.5-6s7.5 2.4 7.5 6" />
+    </svg>
+  );
+}
+
+export function ReceiptIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 3.5h12v17l-3-2-3 2-3-2-3 2v-17Z" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
+    </svg>
+  );
+}
+
+export function PercentIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 18 18 6" />
+      <circle cx="7.5" cy="7.5" r="2.5" />
+      <circle cx="16.5" cy="16.5" r="2.5" />
+    </svg>
+  );
+}
+
+export function ReportIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 3.5h9l3.5 3.5v13.5h-12.5v-17Z" />
+      <path d="M14.5 3.5V7H18" />
+      <path d="M9 12h6M9 15.5h6M9 8.5h2" />
+    </svg>
+  );
+}

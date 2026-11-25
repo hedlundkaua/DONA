@@ -12,12 +12,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect("/login");
   }
 
-  const nome = sessao.status === "autenticado" ? sessao.user.nome : "Operadora";
+  const usuario = sessao.status === "autenticado" ? sessao.user : null;
+  const nome = usuario?.nome ?? "Operadora";
   const aviso =
     sessao.status === "indisponivel" ? sessao.mensagem : null;
 
   return (
-    <AppShell nome={nome} aviso={aviso}>
+    <AppShell
+      nome={nome}
+      nomeEmpresa={usuario?.nomeEmpresa ?? null}
+      perfil={usuario?.perfil ?? null}
+      aviso={aviso}
+    >
       {children}
     </AppShell>
   );

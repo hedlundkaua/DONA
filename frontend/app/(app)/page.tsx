@@ -11,9 +11,11 @@ import {
   ClipboardIcon,
   MovementsIcon,
   PlusIcon,
+  WalletIcon,
 } from "@/components/ui/icons";
 import { VendaCard } from "@/components/vendas/venda-card";
 import { backendFetch } from "@/lib/api";
+import { produtosParaReposicao } from "@/lib/estoque";
 import {
   formatDataHora,
   formatQuantidade,
@@ -26,6 +28,7 @@ import {
   podeCriarVenda,
   podeGerirCatalogo,
   podeMovimentar,
+  podeVerFinanceiro,
 } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
 import type { Movimentacao, PaginaVendas, Produto } from "@/lib/types";
@@ -56,11 +59,12 @@ export default async function PainelPage() {
   const podeCorrigir = podeAjustar(perfil);
   const soSaida = apenasSaidas(perfil);
   const podeVender = podeCriarVenda(perfil);
+  const podeFinanceiro = podeVerFinanceiro(perfil);
 
   const titulo = (
     <PageTitle
       sobretitulo="Início / Painel"
-      titulo={nome ? `Olá, ${nome.split(" ")[0]}` : "Resumo da cooperativa"}
+      titulo={nome ? `Olá, ${nome.split(" ")[0]}` : "Resumo do negócio"}
       descricao="Visão rápida das vendas, dos produtos e do movimento de hoje."
       acao={
         podeVender ? (
@@ -83,11 +87,7 @@ export default async function PainelPage() {
   }
 
   const produtos = produtosRes.data;
-  const baixos = produtos
-    .filter((produto) => statusEstoque(produto) !== "normal")
-    .sort(
-      (a, b) => Number(a.quantidadeEstoque) - Number(b.quantidadeEstoque),
-    );
+  const baixos = produtosParaReposicao(produtos);
   const esgotados = produtos.filter(
     (produto) => Number(produto.quantidadeEstoque) <= 0,
   );
@@ -115,15 +115,15 @@ export default async function PainelPage() {
               cadastrados e disponíveis
             </p>
           </div>
-          <div className="rounded-xl border border-white/70 bg-white/85 p-3">
+          <Link href="/produtos/reposicao" data-testid="painel-estoque-baixo" className="block rounded-xl border border-white/70 bg-white/85 p-3 transition-colors hover:bg-pink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40">
             <p className="text-[11px] font-bold uppercase tracking-wide text-plum">
               Abaixo do mínimo
             </p>
             <p className="mt-1 text-3xl font-bold leading-none text-plum">
               {baixos.length}
             </p>
-            <p className="mt-1 text-[11px] text-muted">precisam de reposição</p>
-          </div>
+            <p className="mt-1 text-[11px] text-muted">Ver lista de reposição →</p>
+          </Link>
         </div>
       </HeroCard>
 
@@ -229,6 +229,38 @@ export default async function PainelPage() {
         </div>
       ) : null}
 
+      {podeFinanceiro ? (
+        <Card className="mt-4 p-0">
+          <div className="flex items-center gap-3 px-4 pt-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-pink">
+              <WalletIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <CardTitle>Financeiro</CardTitle>
+              <p className="mt-0.5 text-xs text-muted">
+                Parcelas, caixa e relatórios de vendas.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 divide-x divide-line border-t border-line">
+            {[
+              { href: "/financeiro?aba=parcelas", rotulo: "Parcelas" },
+              { href: "/financeiro?aba=caixa", rotulo: "Caixa" },
+              { href: "/financeiro?aba=vendas", rotulo: "Relatórios" },
+            ].map(({ href, rotulo }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center justify-center gap-1 px-2 py-3 text-xs font-semibold text-plum transition-colors hover:bg-pink-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pink/40"
+              >
+                {rotulo}
+                <ChevronRightIcon className="h-3.5 w-3.5" />
+              </Link>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       <div className="mt-5">
         <div className="mb-2 flex items-end justify-between gap-3">
           <CardTitle>Vendas recentes</CardTitle>
@@ -290,10 +322,10 @@ export default async function PainelPage() {
         <div className="mb-2 flex items-end justify-between gap-3">
           <CardTitle>Repor agora</CardTitle>
           <Link
-            href="/produtos"
+            href="/produtos/reposicao"
             className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-semibold text-plum focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40"
           >
-            Ver produtos
+            Ver lista completa
             <ChevronRightIcon className="h-4 w-4" />
           </Link>
         </div>
@@ -394,7 +426,7 @@ export default async function PainelPage() {
         <div className="mt-5">
           <EmptyState
             titulo="Comece pelo primeiro produto"
-            descricao="Cadastre os itens da cooperativa para acompanhar saldo, mínimo e reposição."
+            descricao="Cadastre os itens do negócio para acompanhar saldo, mínimo e reposição."
             icone={<BoxIcon className="h-6 w-6" />}
             acao={
               podeCriar ? (

@@ -14,6 +14,7 @@ import {
   formatMoeda,
   formatQuantidade,
 } from "@/lib/format";
+import { rotuloForma, rotuloModalidade } from "@/lib/financeiro";
 import type { Venda } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Detalhe da venda" };
@@ -80,6 +81,14 @@ export default async function DetalheVendaPage({
 
   const venda = vendaRes.data;
   const pago = venda.statusPagamento === "PAGO";
+  const forma = venda.forma;
+  const modalidade = venda.modalidade;
+  const bandeira = venda.bandeira;
+  const numeroParcelas = venda.numeroParcelas;
+  const valorBruto = venda.total;
+  const valorTaxa = venda.taxa ?? null;
+  const valorLiquido = venda.liquido ?? null;
+  const recebido = pago;
   const quantidadeTotal = venda.itens.reduce(
     (soma, item) => soma + item.quantidade,
     0,
@@ -180,6 +189,108 @@ export default async function DetalheVendaPage({
         </div>
       </div>
 
+      {forma ? (
+        <div className="mt-3">
+          <div data-testid="venda-pagamento">
+            <Card>
+              <CardTitle>Pagamento</CardTitle>
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                <div>
+                  <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">
+                    Forma
+                  </dt>
+                  <dd className="mt-0.5 font-semibold text-navy">
+                    {rotuloForma(forma)}
+                    {bandeira ? ` · ${bandeira}` : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">
+                    {modalidade ? "Modalidade" : "Recebimento"}
+                  </dt>
+                  <dd className="mt-0.5 font-semibold text-navy">
+                    {modalidade
+                      ? `${rotuloModalidade(modalidade)}${numeroParcelas ? ` · ${numeroParcelas}x` : ""}`
+                      : recebido
+                        ? "Confirmado"
+                        : "Aguardando"}
+                  </dd>
+                </div>
+              </dl>
+
+              <dl className="mt-3 space-y-1.5 border-t border-line pt-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted">Bruto</dt>
+                  <dd className="font-semibold text-navy">
+                    {formatMoeda(valorBruto)}
+                  </dd>
+                </div>
+                {valorTaxa !== null ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted">Taxa</dt>
+                    <dd className="font-semibold text-amber-700">
+                      {formatMoeda(valorTaxa)}
+                    </dd>
+                  </div>
+                ) : null}
+                {valorLiquido !== null ? (
+                  <div className="flex items-center justify-between gap-3 border-t border-line pt-1.5">
+                    <dt className="font-semibold text-navy">Líquido</dt>
+                    <dd className="text-base font-bold text-plum">
+                      {formatMoeda(valorLiquido)}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              {venda.parcelas && venda.parcelas.length > 0 ? (
+                <div
+                  className="mt-3 border-t border-line pt-3"
+                  data-testid="venda-parcelas"
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+                    Parcelas
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {venda.parcelas.map((parcela) => (
+                      <li
+                        key={parcela.id}
+                        className="flex items-center justify-between gap-3 text-sm"
+                      >
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-navy">
+                            {numeroParcelas
+                              ? `${parcela.numero}/${numeroParcelas}`
+                              : `Parcela ${parcela.numero}`}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted">
+                            {formatData(parcela.vencimento)}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          <span className="block font-semibold text-navy">
+                            {formatMoeda(parcela.valor)}
+                          </span>
+                          <span
+                            className={
+                              parcela.recebidoEm
+                                ? "mt-0.5 block text-[11px] font-medium text-emerald-700"
+                                : "mt-0.5 block text-[11px] font-medium text-amber-700"
+                            }
+                          >
+                            {parcela.recebidoEm ? "Recebida" : "Pendente"}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </Card>
+          </div>
+        </div>
+      ) : null}
+
       {venda.observacoes ? (
         <div className="mt-4">
           <Card>
@@ -229,8 +340,8 @@ export default async function DetalheVendaPage({
           </p>
           <p className="mt-1 text-xs leading-relaxed text-amber-800">
             Esta versão não permite alterar, cancelar ou excluir vendas. O
-            pagamento é apenas a condição declarada no pedido e não gera baixa
-            financeira.
+            pagamento registra a condição e as parcelas no financeiro; taxas e
+            valores oficiais são recalculados pelo servidor.
           </p>
         </Card>
       </div>

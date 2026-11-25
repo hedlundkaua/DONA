@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PerfilUsuario } from "@prisma/client";
-import { clearSessionCookie, requireUser } from "@/lib/auth";
+import { clearSessionCookie, publicAccount, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serverError } from "@/lib/api-response";
 
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) return auth.response;
     const remainingSeconds = Math.max(0, Math.ceil((auth.sessionExpiresAt.getTime() - Date.now()) / 1000));
     return NextResponse.json({ success: true, data: {
-      user: auth.user,
+      user: publicAccount(auth.user),
       csrfToken: auth.csrfToken,
       expiresAt: auth.sessionExpiresAt.toISOString(),
       csrfMaxAgeSeconds: remainingSeconds,

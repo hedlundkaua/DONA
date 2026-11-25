@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/icons";
 import { selectBase } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
+import { faltaEstoque } from "@/lib/estoque";
 import {
   formatMoeda,
   formatQuantidade,
@@ -64,6 +65,7 @@ export function ProdutosLista({
         return true;
       })
       .sort((a, b) => {
+        if (status === "baixos") return faltaEstoque(b) - faltaEstoque(a) || a.nome.localeCompare(b.nome, "pt-BR");
         if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
         return a.nome.localeCompare(b.nome, "pt-BR");
       });

@@ -38,7 +38,7 @@ export function AuthShell({
             <Logo className="h-16 w-16 sm:h-20 sm:w-20" />
           </Link>
           <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.22em] text-pink">
-            Empreendedoras Restinga
+            Gestão do seu negócio
           </p>
           <h1 className="mt-1 text-[32px] font-bold leading-tight tracking-tight text-navy">
             DONA

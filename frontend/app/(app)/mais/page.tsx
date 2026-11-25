@@ -8,53 +8,80 @@ import {
   LockIcon,
   MovementsIcon,
   TagIcon,
+  UserIcon,
+  WalletIcon,
 } from "@/components/ui/icons";
+import { podeVerFinanceiro } from "@/lib/permissions";
+import { getSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Mais" };
+export const dynamic = "force-dynamic";
 
-const atalhos = [
-  {
-    href: "/categorias",
-    titulo: "Categorias",
-    descricao: "Organize os produtos por tipo e mantenha o catálogo consistente.",
-    Icone: TagIcon,
-    testId: "mais-categorias",
-  },
-  {
-    href: "/movimentos",
-    titulo: "Movimentos",
-    descricao: "Consulte entradas e saídas de estoque da cooperativa.",
-    Icone: MovementsIcon,
-    testId: "mais-movimentos",
-  },
-  {
-    href: "/ajustes",
-    titulo: "Ajustes",
-    descricao: "Corrija o saldo após conferência física, perdas ou avarias.",
-    Icone: ClipboardIcon,
-    testId: "mais-ajustes",
-  },
-  {
-    href: "/mais/senha",
-    titulo: "Alterar senha",
-    descricao: "Atualize sua senha de acesso e encerre as outras sessões.",
-    Icone: LockIcon,
-    testId: "mais-senha",
-  },
-] as const;
+export default async function MaisPage() {
+  const sessao = await getSession();
+  const perfil = sessao.status === "autenticado" ? sessao.user.perfil : null;
 
-export default function MaisPage() {
+  const atalhos = [
+    {
+      href: "/mais/meus-dados",
+      titulo: "Meus dados",
+      descricao: "Atualize seu nome, usuário, empresa e e-mail de acesso.",
+      Icone: UserIcon,
+      testId: "mais-meus-dados",
+    },
+    ...(podeVerFinanceiro(perfil)
+      ? [
+          {
+            href: "/financeiro",
+            titulo: "Financeiro",
+            descricao:
+              "Acompanhe parcelas, caixa, lançamentos e relatórios de vendas.",
+            Icone: WalletIcon,
+            testId: "mais-financeiro",
+          },
+        ]
+      : []),
+    {
+      href: "/categorias",
+      titulo: "Categorias",
+      descricao: "Organize os produtos por tipo e mantenha o catálogo consistente.",
+      Icone: TagIcon,
+      testId: "mais-categorias",
+    },
+    {
+      href: "/movimentos",
+      titulo: "Movimentos",
+      descricao: "Consulte entradas e saídas de estoque do negócio.",
+      Icone: MovementsIcon,
+      testId: "mais-movimentos",
+    },
+    {
+      href: "/ajustes",
+      titulo: "Ajustes",
+      descricao: "Corrija o saldo após conferência física, perdas ou avarias.",
+      Icone: ClipboardIcon,
+      testId: "mais-ajustes",
+    },
+    {
+      href: "/mais/senha",
+      titulo: "Alterar senha",
+      descricao: "Atualize sua senha de acesso e encerre as outras sessões.",
+      Icone: LockIcon,
+      testId: "mais-senha",
+    },
+  ];
+
   return (
     <>
       <PageTitle
         sobretitulo="Mais / Cadastros"
         titulo="Mais"
-        descricao="Acesse os cadastros e as operações de apoio do sistema."
+        descricao="Acesse seus dados, o financeiro e as operações de apoio do sistema."
       />
 
       <Card className="p-0">
         <div className="px-4 pt-4">
-          <CardTitle>Cadastros, estoque e segurança</CardTitle>
+          <CardTitle>Conta, financeiro e cadastros</CardTitle>
         </div>
         <div className="mt-3 divide-y divide-line">
           {atalhos.map(({ href, titulo, descricao, Icone, testId }) => (
@@ -82,8 +109,8 @@ export default function MaisPage() {
       </Card>
 
       <p className="mt-4 text-xs leading-relaxed text-muted">
-        Vendas e Clientes ficam na navegação principal. O Financeiro será
-        incluído quando o módulo financeiro estiver disponível na API.
+        Vendas e Clientes ficam na navegação principal. O Financeiro aparece
+        apenas para os perfis de administração, gestão e financeiro.
       </p>
     </>
   );

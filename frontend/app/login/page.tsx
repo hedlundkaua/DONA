@@ -17,6 +17,9 @@ export default async function LoginPage({
   const params = await searchParams;
   const bruto = typeof params.next === "string" ? params.next : "/";
   const destino = bruto.startsWith("/") && !bruto.startsWith("//") ? bruto : "/";
+  const emailAlterado = params.alterado === "1";
+  const emailPreenchido =
+    typeof params.email === "string" ? params.email.trim() : "";
 
   const sessao = await getSession();
   if (sessao.status === "autenticado") redirect(destino);
@@ -45,6 +48,12 @@ export default async function LoginPage({
           avisoInicial={
             sessao.status === "indisponivel" ? sessao.mensagem : null
           }
+          mensagemInicial={
+            emailAlterado
+              ? "E-mail alterado. Entre novamente usando o novo endereço."
+              : null
+          }
+          identificadorInicial={emailPreenchido}
         />
       </AuthCard>
     </AuthShell>

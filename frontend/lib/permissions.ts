@@ -62,6 +62,30 @@ export function podeVerCusto(perfil?: string | null): boolean {
   return perfil !== "VENDEDOR";
 }
 
+/** Navegação e consultas do módulo Financeiro. */
+export function podeVerFinanceiro(perfil?: string | null): boolean {
+  return (
+    perfil === "ADMINISTRADOR" ||
+    perfil === "GESTOR" ||
+    perfil === "FINANCEIRO"
+  );
+}
+
+/** Lançamentos de caixa e confirmação de recebimento de parcelas. */
+export function podeOperarFinanceiro(perfil?: string | null): boolean {
+  return podeVerFinanceiro(perfil);
+}
+
+/** Configuração da tabela de taxas de cartão. */
+export function podeGerirTaxas(perfil?: string | null): boolean {
+  return perfil === "ADMINISTRADOR" || perfil === "GESTOR";
+}
+
+/** Somente a administração altera o nome da empresa no cadastro da conta. */
+export function podeEditarNomeEmpresa(perfil?: string | null): boolean {
+  return perfil === "ADMINISTRADOR";
+}
+
 export function rotuloPerfil(perfil?: string | null): string {
   const rotulos: Record<string, string> = {
     ADMINISTRADOR: "Administradora",

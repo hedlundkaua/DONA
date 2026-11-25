@@ -12,9 +12,13 @@ function etherealTestRuntime(): boolean {
     const r5Target = url.port === "5433" && database === "dona_test_r5";
     const isolatedPlanTarget = url.port === "5544" && database === "dona_backend_plan_test_20261113";
     const irisIntegrationTarget = url.port === "5546" && database === "dona_iris_integration_20261113";
+    const localHosts = ["localhost", "127.0.0.1", "::1"];
+    const smtpHost = process.env.EMAIL_SMTP_HOST?.trim().toLowerCase().replace(/^\[|\]$/g, "");
+    const r6Target = url.port === "5548" && database === "dona_test_r6" && process.env.DONA_TEST_MODE === "1"
+      && smtpHost !== undefined && localHosts.includes(smtpHost);
     return ["postgres:", "postgresql:"].includes(url.protocol)
-      && ["localhost", "127.0.0.1", "::1"].includes(hostname)
-      && (r5Target || isolatedPlanTarget || irisIntegrationTarget);
+      && localHosts.includes(hostname)
+      && (r5Target || isolatedPlanTarget || irisIntegrationTarget || r6Target);
   } catch { return false; }
 }
 

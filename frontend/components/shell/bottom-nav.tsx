@@ -8,10 +8,12 @@ import {
   ClientsIcon,
   HomeIcon,
   MoreIcon,
+  WalletIcon,
 } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { podeVerFinanceiro } from "@/lib/permissions";
 
-const itens = [
+const itensBase = [
   { href: "/", rotulo: "Início", Icone: HomeIcon },
   { href: "/produtos", rotulo: "Produtos", Icone: BoxIcon },
   { href: "/vendas", rotulo: "Vendas", Icone: ChartIcon },
@@ -34,15 +36,28 @@ function testId(href: string) {
   return href === "/" ? "nav-inicio" : `nav-${href.slice(1)}`;
 }
 
-export function BottomNav() {
+export function BottomNav({ perfil }: { perfil?: string | null }) {
   const pathname = usePathname();
+  const comFinanceiro = podeVerFinanceiro(perfil);
+  const itens = comFinanceiro
+    ? [
+        ...itensBase.slice(0, 3),
+        { href: "/financeiro", rotulo: "Financeiro", Icone: WalletIcon },
+        ...itensBase.slice(3),
+      ]
+    : itensBase;
 
   return (
     <nav
       aria-label="Navegação principal"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/97 backdrop-blur safe-bottom"
     >
-      <ul className="mx-auto grid w-full max-w-2xl grid-cols-5 px-1 pt-1.5">
+      <ul
+        className={cn(
+          "mx-auto grid w-full max-w-2xl px-1 pt-1.5",
+          comFinanceiro ? "grid-cols-6" : "grid-cols-5",
+        )}
+      >
         {itens.map(({ href, rotulo, Icone }) => {
           const ativo = estaAtivo(pathname, href);
           return (
@@ -52,7 +67,8 @@ export function BottomNav() {
                 aria-current={ativo ? "page" : undefined}
                 data-testid={testId(href)}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-semibold transition-colors",
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 font-semibold transition-colors",
+                  comFinanceiro ? "text-[10px]" : "text-[11px]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40",
                   ativo
                     ? "bg-pink-50 text-pink"

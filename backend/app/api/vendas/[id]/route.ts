@@ -6,6 +6,8 @@ import { badRequest, notFound, ok, serverError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { parseId } from "@/lib/validators";
 
+import { totaisPagamento } from "@/lib/venda-pagamento";
+
 type Params = { params: Promise<{ id: string }> };
 export async function GET(req: NextRequest, { params }: Params) {
   try {
@@ -16,6 +18,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const venda = await prisma.venda.findFirst({
       where: { id, negocioId: auth.user.negocioId },
       include: {
+        parcelas: { orderBy: { numero: "asc" }, select: { id: true, numero: true, vencimento: true, valor: true, recebidoEm: true } },
         cliente: { select: { id: true, nome: true } },
         usuario: { select: { id: true, nome: true, nomeUsuario: true, perfil: true } },
         itens: { include: { produto: { select: { id: true, nome: true, unidadeMedida: true } } }, orderBy: { id: "asc" } },
@@ -23,6 +26,6 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
     });
     if (!venda) return notFound("Venda");
-    return ok({ ...venda, total: venda.total.toFixed(2), itens: venda.itens.map((item) => ({ ...item, valorUnitario: item.valorUnitario.toFixed(2), subtotal: item.subtotal.toFixed(2) })), movimentacoes: venda.movimentacoes.map((m) => ({ ...m, quantidade: m.quantidade.toFixed(2) })) });
+    return ok({ ...venda, ...totaisPagamento(venda), parcelas:venda.parcelas.map(p => ({...p,valor:p.valor.toFixed(2)})), total: venda.total.toFixed(2), itens: venda.itens.map((item) => ({ ...item, valorUnitario: item.valorUnitario.toFixed(2), subtotal: item.subtotal.toFixed(2) })), movimentacoes: venda.movimentacoes.map((m) => ({ ...m, quantidade: m.quantidade.toFixed(2) })) });
   } catch (err) { return serverError(err); }
 }

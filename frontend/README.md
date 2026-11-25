@@ -1,8 +1,9 @@
 # DONA — Frontend
 
-Interface mobile-first para a gestão de produtos, estoque, clientes e vendas
-das Empreendedoras Restinga. Consome **exclusivamente** a API real do backend
-DONA, sem dados fictícios ou mocks na aplicação.
+Interface mobile-first para a gestão de produtos, estoque, clientes, vendas e
+financeiro do seu negócio. A marca exibida é **DONA**, com o nome da empresa
+abaixo do logo. Consome **exclusivamente** a API real do backend DONA, sem
+dados fictícios ou mocks na aplicação.
 
 Os módulos de **Clientes** e **Vendas** estão integrados ao contrato congelado
 do backend: listas, cadastro, edição, venda com múltiplos itens e detalhe usam

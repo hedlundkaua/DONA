@@ -5,10 +5,14 @@ import { InlineAlert } from "@/components/ui/states";
 
 export function AppShell({
   nome,
+  nomeEmpresa,
+  perfil,
   aviso,
   children,
 }: {
   nome: string;
+  nomeEmpresa?: string | null;
+  perfil?: string | null;
   aviso?: string | null;
   children: ReactNode;
 }) {
@@ -20,7 +24,7 @@ export function AppShell({
       >
         Pular para o conteúdo
       </a>
-      <Header nome={nome} />
+      <Header nome={nome} nomeEmpresa={nomeEmpresa} />
       <main
         id="conteudo"
         className="mx-auto w-full max-w-2xl flex-1 px-4 pb-28 pt-5"
@@ -32,7 +36,7 @@ export function AppShell({
         ) : null}
         {children}
       </main>
-      <BottomNav />
+      <BottomNav perfil={perfil} />
     </div>
   );
 }

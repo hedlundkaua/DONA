@@ -53,6 +53,22 @@ export type ClienteSelecao = Pick<Cliente, "id" | "nome">;
 
 export type StatusPagamentoVenda = "PAGO" | "A_PRAZO";
 
+export type FormaPagamento = "DINHEIRO" | "PIX" | "CARTAO";
+export type ModalidadeCartao = "DEBITO" | "CREDITO";
+
+/**
+ * Contrato preliminar combinado com o backend para `POST /api/vendas`.
+ * Preço, taxas e parcelas oficiais são calculados pelo servidor.
+ */
+export interface PagamentoVenda {
+  forma: FormaPagamento;
+  bandeira?: string;
+  modalidade?: ModalidadeCartao;
+  parcelas?: number;
+  primeiroVencimento: string;
+  recebido?: boolean;
+}
+
 export interface ItemVenda {
   id: number;
   vendaId: number;
@@ -93,6 +109,24 @@ export interface Venda {
   };
   itens: ItemVenda[];
   movimentacoes?: MovimentacaoVenda[];
+  /** Snapshot financeiro devolvido pelo backend (campos nulos em vendas antigas). */
+  forma?: FormaPagamento | null;
+  bandeira?: string | null;
+  modalidade?: ModalidadeCartao | null;
+  numeroParcelas?: number | null;
+  percentual?: Decimal | null;
+  taxa?: Decimal | null;
+  liquido?: Decimal | null;
+  parcelas?: ParcelaVenda[];
+
+}
+
+export interface ParcelaVenda {
+  id: number;
+  numero: number;
+  vencimento: string;
+  valor: Decimal;
+  recebidoEm: string | null;
 }
 
 export interface PaginaVendas {
@@ -144,3 +178,73 @@ export interface UnidadeMedidaOpcao {
   valor: string;
   rotulo: string;
 }
+
+/** GET/PATCH /api/conta */
+export interface ContaUsuario {
+  id?: number;
+  nome: string;
+  nomeUsuario: string;
+  nomeEmpresa: string | null;
+  email: string;
+  perfil?: string;
+  ativo?: boolean;
+}
+
+/** GET/PUT /api/financeiro/taxas */
+export interface TaxaCartao {
+  id?: number;
+  bandeira: string;
+  modalidade: ModalidadeCartao;
+  parcelas: number;
+  /** Percentual em string decimal, ex.: "2.99". */
+  percentual: Decimal;
+}
+
+/** GET /api/financeiro/parcelas */
+export interface ParcelaFinanceira extends ParcelaVenda {
+  vendaId: number;
+  cliente: { id: number; nome: string };
+  numeroParcelas: number;
+  status: "PENDENTE" | "RECEBIDA";
+}
+
+/** GET/POST /api/financeiro/lancamentos */
+export interface LancamentoFinanceiro {
+  id: number;
+  tipo: "ENTRADA" | "SAIDA";
+  origem: "MANUAL" | "VENDA";
+  descricao: string;
+  data: string;
+  valor: Decimal;
+  usuario: { id: number; nome: string };
+  vendaId: number | null;
+  parcelaId: number | null;
+}
+
+export interface VendaRelatorio {
+  id: number;
+  cliente: { id: number; nome: string };
+  dataPedido: string;
+  forma: FormaPagamento | null;
+  situacao: "PENDENTE" | "PARCIAL" | "RECEBIDA" | "NAO_INFORMADA";
+  total: Decimal;
+  taxa: Decimal | null;
+  liquido: Decimal | null;
+}
+
+export interface ResumoRelatorioVendas {
+  bruto: Decimal;
+  taxas: Decimal;
+  liquidoPrevisto: Decimal;
+  quantidade: number;
+}
+
+export interface PaginaFinanceira<T, S> {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+  resumo: S;
+}
+
+export type RelatorioVendas = PaginaFinanceira<VendaRelatorio, ResumoRelatorioVendas>;

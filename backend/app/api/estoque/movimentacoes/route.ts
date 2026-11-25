@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
         movimentacao,
         saldoAtual: produtoAtualizado?.quantidadeEstoque,
         alertaEstoqueBaixo: produtoAtualizado
-          ? produtoAtualizado.quantidadeEstoque.lessThanOrEqualTo(produtoAtualizado.estoqueMinimo)
+          ? produtoAtualizado.quantidadeEstoque.lessThan(produtoAtualizado.estoqueMinimo)
           : false,
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });

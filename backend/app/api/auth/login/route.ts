@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     await prisma.sessaoUsuario.create({ data: { negocioId: user.negocioId, usuarioId: user.id, authVersion: user.authVersion, tokenHash: hashSessionToken(token), expiraEm: expiresAt } });
 
     const response = NextResponse.json({ success: true, data: { user: {
-      id: user.id, nome: user.nome, nomeUsuario: user.nomeUsuario, email: user.email, perfil: user.perfil,
+      id: user.id, nome: user.nome, nomeUsuario: user.nomeUsuario, email: user.email, perfil: user.perfil, nomeEmpresa: user.negocio.nomeEmpresa,
     }, csrfToken, csrfMaxAgeSeconds: ttlSeconds, expiresAt: expiresAt.toISOString() } }, { status: 200 });
     setSessionCookie(response, token, ttlSeconds);
     return response;

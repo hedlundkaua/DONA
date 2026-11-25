@@ -171,7 +171,7 @@ export function ProdutoForm({
             htmlFor="produto-nome"
             required
             error={erros["produto-nome"]}
-            hint="Como o item é conhecido na cooperativa."
+            hint="Como o item é conhecido no negócio."
           >
             <input
               id="produto-nome"

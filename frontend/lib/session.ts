@@ -7,6 +7,7 @@ export interface SessionUser {
   id: number;
   nome: string;
   nomeUsuario: string;
+  nomeEmpresa: string | null;
   email: string;
   perfil: string;
   ativo: boolean;

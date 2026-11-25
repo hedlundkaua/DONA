@@ -1,0 +1,1 @@
+ALTER TYPE finalidade_otp ADD VALUE 'ALTERAR_EMAIL';

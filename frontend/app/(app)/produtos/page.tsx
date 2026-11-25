@@ -26,7 +26,7 @@ export default async function ProdutosPage() {
     <PageTitle
       sobretitulo="Início / Produtos"
       titulo="Produtos"
-      descricao="Consulte saldos, preços e situação de cada item da cooperativa."
+      descricao="Consulte saldos, preços e situação de cada item do negócio."
       acao={
         podeCriar ? (
           <ButtonLink href="/produtos/novo" tamanho="sm">

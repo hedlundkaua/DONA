@@ -35,6 +35,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (id === auth.user.id && (nextRole !== current.perfil || nextActive !== current.ativo)) return unprocessable("Não é permitido alterar o próprio perfil ou status.");
 
     const emailWillChange = body.email !== undefined && body.email.trim().toLowerCase() !== current.email;
+    if (id === auth.user.id && emailWillChange) return badRequest("Altere o próprio e-mail em Meus dados e confirme com o código enviado.");
     const revokeSessions = !nextActive || nextRole !== current.perfil || emailWillChange;
     const usuario = await prisma.$transaction(async (tx) => {
       if (current.perfil === PerfilUsuario.ADMINISTRADOR && (!nextActive || nextRole !== PerfilUsuario.ADMINISTRADOR)) {

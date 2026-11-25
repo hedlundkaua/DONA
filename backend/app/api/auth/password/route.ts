@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     if (!auth.ok) return auth.response;
     const body = await parseJsonObject(req);
     if (!body || typeof body.currentPassword !== "string" || typeof body.newPassword !== "string") return badRequest("Informe a senha atual e a nova senha.");
-    if (!isValidNewPassword(body.newPassword)) return badRequest("Password needs 8 characters, max 72 UTF-8 bytes, and cannot be on the common-password list.");
+    if (!isValidNewPassword(body.newPassword)) return badRequest("Use uma senha de pelo menos 8 caracteres, com até 72 bytes UTF-8. Evite senhas comuns.");
     const user = await prisma.usuario.findFirst({ where: { id: auth.user.id, negocioId: auth.user.negocioId } });
     if (!user || !await bcrypt.compare(body.currentPassword, user.senhaHash)) return NextResponse.json({ success: false, error: "Senha atual inválida." }, { status: 401 });
     const senhaHash = await bcrypt.hash(body.newPassword, 12);

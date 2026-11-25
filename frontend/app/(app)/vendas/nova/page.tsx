@@ -11,10 +11,11 @@ import {
   podeCriarVenda,
   podeGerirCatalogo,
   podeGerirClientes,
+  podeGerirTaxas,
   podeVerClientes,
 } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
-import type { Categoria, ClienteSelecao, Produto } from "@/lib/types";
+import type { Categoria, ClienteSelecao, Produto, TaxaCartao } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Nova venda" };
 export const dynamic = "force-dynamic";
@@ -32,10 +33,11 @@ export default async function NovaVendaPage() {
     );
   }
 
-  const [clientesRes, produtosRes, categoriasRes] = await Promise.all([
+  const [clientesRes, produtosRes, categoriasRes, taxasRes] = await Promise.all([
     backendFetch<ClienteSelecao[]>("/api/clientes?ativo=true"),
     backendFetch<Produto[]>("/api/produtos?ativo=true"),
     backendFetch<Categoria[]>("/api/categorias?ativo=true"),
+    backendFetch<{ taxas: TaxaCartao[] }>("/api/financeiro/taxas"),
   ]);
 
   const titulo = (
@@ -144,6 +146,9 @@ export default async function NovaVendaPage() {
       <VendaForm
         clientes={clientes}
         produtos={produtos}
+        taxas={taxasRes.ok ? taxasRes.data.taxas : []}
+        avisoTaxas={taxasRes.ok ? null : taxasRes.message}
+        podeConfigurarTaxas={podeGerirTaxas(perfil)}
         dataHoje={hojeISO()}
       />
     </>

@@ -91,7 +91,7 @@ export default async function NovoAjustePage({
         >
           saída de estoque
         </Link>
-        , se a cooperativa preferir esse fluxo.
+        , se o negócio preferir esse fluxo.
       </p>
     </>
   );

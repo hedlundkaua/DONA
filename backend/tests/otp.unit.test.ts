@@ -50,6 +50,12 @@ test("mail configuration fails closed and Ethereal test guard is exact", () => {
     assert.equal(emailProviderConfigured(), false);
     process.env.DATABASE_URL = "postgresql://user@localhost:5432/dona_test_r5?schema=public";
     assert.equal(emailProviderConfigured(), false);
+    process.env.DATABASE_URL = "postgresql://user@127.0.0.1:5548/dona_test_r6";
+    assert.equal(emailProviderConfigured(), false);
+    process.env.EMAIL_SMTP_HOST = "127.0.0.1";
+    assert.equal(emailProviderConfigured(), true);
+    delete process.env.DONA_TEST_MODE;
+    assert.equal(emailProviderConfigured(), false);
     process.env.DATABASE_URL = "postgresql://user@remote.example:5433/dona_test_r5?schema=public";
     assert.equal(emailProviderConfigured(), false);
     (process.env as Record<string, string | undefined>).NODE_ENV = "test";
@@ -100,6 +106,14 @@ test("codes are six digits; keyed hashes are purpose and user bound", () => {
     assert.equal(constantEqual(valid, hashOtp(code, FinalidadeOtp.VERIFICAR_EMAIL, 123)), true);
     assert.equal(constantEqual(valid, hashOtp(code, FinalidadeOtp.RECUPERAR_SENHA, 123)), false);
     assert.equal(constantEqual(valid, hashOtp(code, FinalidadeOtp.VERIFICAR_EMAIL, 124)), false);
+    const binding = { email: "new@example.test", authVersion: 2 };
+    const change = hashOtp(code, FinalidadeOtp.ALTERAR_EMAIL, 123, binding);
+    assert.notEqual(change, valid);
+    assert.notEqual(change, hashOtp(code, FinalidadeOtp.ALTERAR_EMAIL, 124, binding));
+    assert.notEqual(change, hashOtp(code, FinalidadeOtp.ALTERAR_EMAIL, 123, { ...binding, authVersion: 3 }));
+    assert.notEqual(change, hashOtp(code, FinalidadeOtp.ALTERAR_EMAIL, 123, { ...binding, email: "different@example.test" }));
+    assert.equal(change, hashOtp(code, FinalidadeOtp.ALTERAR_EMAIL, 123, { ...binding, email: " NEW@EXAMPLE.TEST " }));
+    assert.throws(() => hashOtp(code, FinalidadeOtp.ALTERAR_EMAIL, 123));
   } finally {
     if (priorPepper === undefined) delete process.env.OTP_PEPPER;
     else process.env.OTP_PEPPER = priorPepper;

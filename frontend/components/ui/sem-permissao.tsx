@@ -3,7 +3,7 @@ import { EmptyState } from "@/components/ui/states";
 import { AlertIcon } from "@/components/ui/icons";
 
 export function SemPermissao({
-  descricao = "Seu perfil não tem permissão para esta ação. Fale com a administração da cooperativa.",
+  descricao = "Seu perfil não tem permissão para esta ação. Fale com a administração do negócio.",
 }: {
   descricao?: string;
 }) {

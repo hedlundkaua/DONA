@@ -1,7 +1,7 @@
-﻿/**
+/**
  * GET /api/produtos/estoque-baixo
  *
- * Lista produtos cuja quantidadeEstoque <= estoqueMinimo.
+ * Lista produtos cuja quantidadeEstoque < estoqueMinimo.
  * Usa query SQL direta pois Prisma nÃ£o suporta comparar duas colunas no WHERE.
  *
  * Fonte: FadConecta - Produtos com Estoque Baixo - Felipe Molina.docx
@@ -42,7 +42,7 @@ export async function GET(_req: NextRequest) {
       JOIN categorias_produtos c ON c.id = p.categoria_id AND c.negocio_id = p.negocio_id
       WHERE p.ativo = true
         AND p.negocio_id = ${auth.user.negocioId}::uuid
-        AND p.quantidade_estoque <= p.estoque_minimo
+        AND p.quantidade_estoque < p.estoque_minimo
       ORDER BY (p.estoque_minimo - p.quantidade_estoque) DESC, p.nome ASC
     `;
 

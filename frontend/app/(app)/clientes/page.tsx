@@ -168,7 +168,7 @@ export default async function ClientesPage({
           descricao={
             temFiltro
               ? "Tente outro nome, telefone ou situação."
-              : "Cadastre o primeiro contato para usar nas vendas da cooperativa."
+              : "Cadastre o primeiro contato para usar nas vendas do negócio."
           }
           icone={<ClientsIcon className="h-6 w-6" />}
           acao={

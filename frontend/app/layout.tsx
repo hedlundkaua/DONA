@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     template: "%s · DONA",
   },
   description:
-    "Controle de produtos, categorias e estoque das Empreendedoras Restinga.",
+    "Controle de produtos, categorias, estoque, vendas e financeiro do seu negócio.",
   applicationName: "DONA",
 };
 

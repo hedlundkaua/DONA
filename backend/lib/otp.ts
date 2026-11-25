@@ -22,8 +22,13 @@ export function normalizeEmail(email: string): string { return email.trim().toLo
 export function otpThrottleKey(email: string, purpose: FinalidadeOtp): string {
   return createHmac("sha256", otpPepper()).update(`dona-otp-throttle:${purpose}:${normalizeEmail(email)}`).digest("hex");
 }
-export function hashOtp(code: string, purpose: FinalidadeOtp, usuarioId: number): string {
-  return createHmac("sha256", otpPepper()).update(`dona-otp:${purpose}:${usuarioId}:${code}`).digest("hex");
+export function hashOtp(code: string, purpose: FinalidadeOtp, usuarioId: number, binding?: { email: string; authVersion: number }): string {
+  const mac = createHmac("sha256", otpPepper()).update(`dona-otp:${purpose}:${usuarioId}:${code}`);
+  if (purpose === FinalidadeOtp.ALTERAR_EMAIL) {
+    if (!binding) throw new Error("Missing email change context");
+    mac.update(JSON.stringify([normalizeEmail(binding.email), binding.authVersion]));
+  }
+  return mac.digest("hex");
 }
 export function newOtpCode(): string { return randomInt(0, 1_000_000).toString().padStart(6, "0"); }
 export function constantEqual(a: string, b: string): boolean {
@@ -54,20 +59,25 @@ export async function issueOtp(email: string, negocioId: string, usuarioId: numb
   return deliverReservedOtp(email, negocioId, usuarioId, purpose);
 }
 
-export async function deliverReservedOtp(email: string, negocioId: string, usuarioId: number, purpose: FinalidadeOtp): Promise<boolean> {
+export async function deliverReservedOtp(email: string, negocioId: string, usuarioId: number, purpose: FinalidadeOtp, authVersion?: number): Promise<boolean> {
   const code = newOtpCode();
   const now = new Date();
   const key = otpThrottleKey(email, purpose);
-  const hashCodigo = hashOtp(code, purpose, usuarioId);
+  const hashCodigo = hashOtp(code, purpose, usuarioId, authVersion === undefined ? undefined : { email, authVersion });
   const challenge = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT chave FROM limites_envio_otp WHERE chave = ${key} FOR UPDATE`;
+    // Recheck identity under lock if the address changed while the request was in flight.
+    const [owner] = await tx.$queryRaw<Array<{ email: string; auth_version: number }>>`
+      SELECT email, auth_version FROM usuarios WHERE negocio_id = ${negocioId}::uuid AND id = ${usuarioId} AND ativo FOR UPDATE`;
+    if (!owner || (purpose === FinalidadeOtp.ALTERAR_EMAIL ? owner.auth_version !== authVersion : owner.email !== email)) return null;
     return tx.codigoOtp.upsert({
       where: { negocioId_usuarioId_finalidade: { negocioId, usuarioId, finalidade: purpose } },
       create: { negocioId, usuarioId, finalidade: purpose, hashCodigo, expiraEm: new Date(now.getTime() + OTP_TTL_MS), envioPendente: true },
       update: { hashCodigo, expiraEm: new Date(now.getTime() + OTP_TTL_MS), tentativas: 0, consumidoEm: null, envioPendente: true, createdAt: now },
     });
   }, { maxWait: 10_000, timeout: 20_000 });
-  const sent = await sendAuthCode(email, code, purpose === FinalidadeOtp.VERIFICAR_EMAIL ? "verification" : "reset");
+  if (!challenge) return false;
+  const sent = await sendAuthCode(email, code, purpose === FinalidadeOtp.RECUPERAR_SENHA ? "reset" : "verification");
   if (sent) await prisma.codigoOtp.updateMany({ where: { id: challenge.id, negocioId, hashCodigo, envioPendente: true }, data: { envioPendente: false } });
   return sent;
 }
@@ -101,6 +111,7 @@ export async function consumeOtp(
   purpose: FinalidadeOtp,
   code: string,
   apply: (tx: Prisma.TransactionClient) => Promise<void>,
+  authVersion?: number,
 ): Promise<boolean> {
   const key = otpThrottleKey(email, purpose);
   const now = new Date();
@@ -111,11 +122,14 @@ export async function consumeOtp(
     const windowStart = throttle[0]?.janela_falhas;
     const blocked = Boolean(windowStart && windowStart.getTime() + OTP_TTL_MS > now.getTime() && throttle[0].falhas_codigo >= OTP_MAX_ATTEMPTS);
     if (blocked || !throttle[0]) return false;
+    const [owner] = await tx.$queryRaw<Array<{ email: string; auth_version: number }>>`
+      SELECT email, auth_version FROM usuarios WHERE negocio_id = ${negocioId}::uuid AND id = ${usuarioId} AND ativo FOR UPDATE`;
+    if (!owner || (purpose === FinalidadeOtp.ALTERAR_EMAIL ? owner.auth_version !== authVersion : owner.email !== email)) return false;
     const challenge = await tx.codigoOtp.findUnique({
       where: { negocioId_usuarioId_finalidade: { negocioId, usuarioId, finalidade: purpose } },
     });
     if (!challenge || challenge.consumidoEm || challenge.expiraEm <= now || challenge.tentativas >= OTP_MAX_ATTEMPTS) return false;
-    const valid = constantEqual(hashOtp(code, purpose, usuarioId), challenge.hashCodigo);
+    const valid = constantEqual(hashOtp(code, purpose, usuarioId, authVersion === undefined ? undefined : { email, authVersion }), challenge.hashCodigo);
     if (!valid) {
       const changed = await tx.codigoOtp.updateMany({
         where: { id: challenge.id, negocioId, hashCodigo: challenge.hashCodigo, consumidoEm: null, expiraEm: { gt: now }, tentativas: { lt: OTP_MAX_ATTEMPTS } },

@@ -7,15 +7,28 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Field, inputBase, selectBase, textareaBase } from "@/components/ui/field";
 import { InlineAlert } from "@/components/ui/states";
 import { PlusIcon, SpinnerIcon } from "@/components/ui/icons";
-import { PagamentoToggle } from "@/components/vendas/pagamento-toggle";
 import { TotalVenda } from "@/components/vendas/total-venda";
 import { cn } from "@/lib/cn";
-import { formatMoeda, formatQuantidade, hojeISO } from "@/lib/format";
+import {
+  buscarTaxa,
+  calcularTaxa,
+  valorEmCentavos,
+  opcoesBandeira,
+  PARCELAS_CREDITO,
+  percentualNumerico,
+  rotuloForma,
+  rotuloModalidade,
+} from "@/lib/financeiro";
+import { formatMoeda, formatQuantidade, hojeISO, somarMeses } from "@/lib/format";
 import { apiFetch } from "@/lib/http";
 import type {
   ClienteSelecao,
+  FormaPagamento,
+  ModalidadeCartao,
+  PagamentoVenda,
   Produto,
   StatusPagamentoVenda,
+  TaxaCartao,
   Venda,
 } from "@/lib/types";
 
@@ -32,27 +45,45 @@ function parseQuantidade(valor: string): number | null {
   return Number.isSafeInteger(numero) && numero > 0 ? numero : null;
 }
 
+const FORMAS: Array<{ valor: FormaPagamento; rotulo: string; testId: string }> = [
+  { valor: "DINHEIRO", rotulo: "Dinheiro", testId: "venda-forma-dinheiro" },
+  { valor: "PIX", rotulo: "Pix", testId: "venda-forma-pix" },
+  { valor: "CARTAO", rotulo: "Cartão", testId: "venda-forma-cartao" },
+];
+
 export function VendaForm({
   clientes,
   produtos,
+  taxas = [],
+  avisoTaxas = null,
+  podeConfigurarTaxas = false,
   dataHoje = hojeISO(),
 }: {
   clientes: ClienteSelecao[];
   produtos: Produto[];
+  taxas?: TaxaCartao[];
+  avisoTaxas?: string | null;
+  podeConfigurarTaxas?: boolean;
   dataHoje?: string;
 }) {
   const router = useRouter();
   const proximoId = useRef(2);
 
   const [clienteId, setClienteId] = useState("");
-  const [statusPagamento, setStatusPagamento] =
-    useState<StatusPagamentoVenda>("PAGO");
   const [dataPedido, setDataPedido] = useState(dataHoje);
-  const [vencimento, setVencimento] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [linhas, setLinhas] = useState<Linha[]>([
     { id: 1, produtoId: "", quantidade: "1" },
   ]);
+
+  const [forma, setForma] = useState<FormaPagamento>("DINHEIRO");
+  const [recebido, setRecebido] = useState(true);
+  const [bandeira, setBandeira] = useState("");
+  const [modalidade, setModalidade] = useState<ModalidadeCartao>("DEBITO");
+  const [parcelas, setParcelas] = useState("1");
+  const [primeiroVencimento, setPrimeiroVencimento] = useState(
+    somarMeses(dataHoje, 1),
+  );
 
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string | null>(null);
@@ -69,8 +100,8 @@ export function VendaForm({
         const produto = produtoPorId.get(Number(linha.produtoId));
         const quantidade = parseQuantidade(linha.quantidade);
         if (!produto || !quantidade) return soma;
-        return soma + Number(produto.precoVenda) * quantidade;
-      }, 0),
+        return soma + valorEmCentavos(produto.precoVenda) * quantidade;
+      }, 0) / 100,
     [linhas, produtoPorId],
   );
 
@@ -83,20 +114,59 @@ export function VendaForm({
     [linhas],
   );
 
+  const ehCartao = forma === "CARTAO";
+  const ehCredito = ehCartao && modalidade === "CREDITO";
+  const parcelasNumero = ehCartao
+    ? ehCredito
+      ? Number(parcelas) || 1
+      : 1
+    : 1;
+  const bandeiras = useMemo(() => opcoesBandeira(taxas), [taxas]);
+  const taxaSelecionada =
+    ehCartao && bandeira
+      ? buscarTaxa(taxas, bandeira, modalidade, parcelasNumero)
+      : null;
+  const taxaIndisponivel =
+    ehCartao && Boolean(bandeira) && !taxaSelecionada;
+  const aliquota = ehCartao
+    ? taxaSelecionada
+      ? percentualNumerico(taxaSelecionada.percentual)
+      : null
+    : 0;
+  const resumo = calcularTaxa(totalPreview, aliquota ?? 0);
+
+  // O backend deriva status e vencimento a partir de `pagamento`. Cartão fica
+  // A_PRAZO até a baixa da parcela; dinheiro/Pix dependem da confirmação.
+  const statusPagamento: StatusPagamentoVenda = ehCartao
+    ? "A_PRAZO"
+    : recebido
+      ? "PAGO"
+      : "A_PRAZO";
+
+  const exigeData =
+    statusPagamento === "A_PRAZO" && (ehCredito || !ehCartao);
+  const dataEfetiva =
+    statusPagamento === "A_PRAZO" && exigeData ? primeiroVencimento : dataPedido;
+
   function descricao(id: string, dica?: string) {
     if (erros[id]) return `${id}-error`;
     return dica ? `${id}-hint` : undefined;
+  }
+
+  function limparErro(chave: string) {
+    setErros((atual) => {
+      if (!atual[chave]) return atual;
+      const copia = { ...atual };
+      delete copia[chave];
+      return copia;
+    });
   }
 
   function atualizarLinha(id: number, campo: "produtoId" | "quantidade", valor: string) {
     setLinhas((atual) =>
       atual.map((linha) => (linha.id === id ? { ...linha, [campo]: valor } : linha)),
     );
-    setErros((atual) => {
-      const copia = { ...atual };
-      delete copia[`linha-${id}-${campo}`];
-      return copia;
-    });
+    limparErro(`linha-${id}-${campo}`);
   }
 
   function adicionarLinha() {
@@ -116,6 +186,33 @@ export function VendaForm({
     });
   }
 
+  function escolherForma(nova: FormaPagamento) {
+    setForma(nova);
+    setErroGeral(null);
+    setErros((atual) => {
+      const copia = { ...atual };
+      delete copia["venda-bandeira"];
+      delete copia["venda-parcelas"];
+      delete copia["venda-vencimento"];
+      delete copia["venda-taxa"];
+      return copia;
+    });
+    if (nova === "CARTAO" && modalidade === "CREDITO") {
+      setPrimeiroVencimento(somarMeses(dataPedido || dataHoje, 1));
+    }
+  }
+
+  function escolherModalidade(nova: ModalidadeCartao) {
+    setModalidade(nova);
+    setParcelas("1");
+    limparErro("venda-parcelas");
+    limparErro("venda-vencimento");
+    limparErro("venda-taxa");
+    if (nova === "CREDITO") {
+      setPrimeiroVencimento(somarMeses(dataPedido || dataHoje, 1));
+    }
+  }
+
   async function salvar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setErroGeral(null);
@@ -129,14 +226,30 @@ export function VendaForm({
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dataPedido)) {
       novosErros["venda-data"] = "Informe a data do pedido.";
+    } else if (!ehCartao && recebido && dataPedido > hojeISO()) {
+      novosErros["venda-data"] =
+        "Um pedido futuro não pode ter recebimento confirmado hoje.";
     }
 
-    if (statusPagamento === "A_PRAZO") {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimento)) {
-        novosErros["venda-vencimento"] = "Informe a data de vencimento.";
-      } else if (vencimento < dataPedido) {
+    if (ehCartao) {
+      if (!bandeira) {
+        novosErros["venda-bandeira"] = "Selecione a bandeira do cartão.";
+      }
+      if (ehCredito && !(parcelasNumero >= 1 && parcelasNumero <= 36)) {
+        novosErros["venda-parcelas"] = "Escolha de 1 a 36 parcelas.";
+      }
+      if (taxaIndisponivel) {
+        novosErros["venda-taxa"] =
+          "Não há taxa configurada para esta combinação de bandeira, modalidade e parcelas.";
+      }
+    }
+
+    if (exigeData) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(primeiroVencimento)) {
+        novosErros["venda-vencimento"] = "Informe a primeira data de recebimento.";
+      } else if (primeiroVencimento < dataPedido) {
         novosErros["venda-vencimento"] =
-          "O vencimento não pode ser anterior à data do pedido.";
+          "A data não pode ser anterior à data do pedido.";
       }
     }
 
@@ -182,17 +295,25 @@ export function VendaForm({
       return;
     }
 
+    const pagamento: PagamentoVenda = {
+      forma,
+      primeiroVencimento: dataEfetiva,
+      ...(ehCartao
+        ? { bandeira, modalidade, parcelas: parcelasNumero }
+        : { recebido }),
+    };
+
     const corpo: Record<string, unknown> = {
       clienteId: Number(clienteId),
-      statusPagamento,
       dataPedido,
       observacoes: observacoes.trim() || null,
       itens: linhas.map((linha) => ({
         produtoId: Number(linha.produtoId),
         quantidade: parseQuantidade(linha.quantidade),
       })),
+      // O servidor deriva status e vencimento do pagamento.
+      pagamento,
     };
-    if (statusPagamento === "A_PRAZO") corpo.vencimento = vencimento;
 
     setSalvando(true);
     const resultado = await apiFetch<Venda>("/vendas", {
@@ -209,6 +330,13 @@ export function VendaForm({
     router.push(`/vendas/${resultado.data.id}`);
     router.refresh();
   }
+
+  const rotuloData =
+    ehCredito
+      ? "Primeiro vencimento"
+      : statusPagamento === "A_PRAZO"
+        ? "Data prevista de recebimento"
+        : "";
 
   return (
     <form onSubmit={salvar} noValidate className="space-y-4" data-testid="venda-form">
@@ -231,11 +359,7 @@ export function VendaForm({
               value={clienteId}
               onChange={(evento) => {
                 setClienteId(evento.target.value);
-                setErros((atual) => {
-                  const copia = { ...atual };
-                  delete copia["venda-cliente"];
-                  return copia;
-                });
+                limparErro("venda-cliente");
               }}
               disabled={salvando}
               aria-invalid={Boolean(erros["venda-cliente"]) || undefined}
@@ -441,49 +565,308 @@ export function VendaForm({
 
       <TotalVenda total={totalPreview.toFixed(2)} quantidadeItens={quantidadeTotal} />
       <p className="-mt-2 text-center text-[11px] text-muted">
-        O total oficial é calculado pelo servidor no momento da confirmação.
+        Total bruto dos itens. O valor oficial é recalculado pelo servidor.
       </p>
 
       <Card>
         <CardTitle>Pagamento</CardTitle>
-        <div className="mt-3 space-y-4">
-          <PagamentoToggle
-            pago={statusPagamento === "PAGO"}
-            onChange={(pago) => {
-              setStatusPagamento(pago ? "PAGO" : "A_PRAZO");
-              if (pago) setVencimento("");
-              setErros((atual) => {
-                const copia = { ...atual };
-                delete copia["venda-vencimento"];
-                return copia;
-              });
-            }}
-            disabled={salvando}
-          />
 
-          {statusPagamento === "A_PRAZO" ? (
+        <fieldset className="mt-3" disabled={salvando}>
+          <legend className="mb-1.5 block text-sm font-semibold text-navy">
+            Forma de pagamento
+          </legend>
+          <div className="grid grid-cols-3 gap-2">
+            {FORMAS.map((opcao) => {
+              const selecionado = forma === opcao.valor;
+              return (
+                <button
+                  key={opcao.valor}
+                  type="button"
+                  data-testid={opcao.testId}
+                  aria-pressed={selecionado}
+                  onClick={() => escolherForma(opcao.valor)}
+                  disabled={salvando}
+                  className={cn(
+                    "min-h-12 rounded-xl border px-2 text-sm font-semibold transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40",
+                    selecionado
+                      ? "border-pink bg-pink-50 text-plum"
+                      : "border-line bg-white text-navy hover:bg-pink-50/60",
+                  )}
+                >
+                  {opcao.rotulo}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {!ehCartao ? (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-xl border border-line bg-slate-50/50 p-3">
+              <label
+                htmlFor="venda-recebido"
+                className="flex cursor-pointer items-start gap-3"
+              >
+                <input
+                  id="venda-recebido"
+                  name="recebido"
+                  data-testid="venda-recebido"
+                  type="checkbox"
+                  checked={recebido}
+                  onChange={(evento) => {
+                    setRecebido(evento.target.checked);
+                    limparErro("venda-vencimento");
+                  }}
+                  disabled={salvando}
+                  aria-describedby="venda-recebido-hint"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-plum focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-navy">
+                    Recebimento confirmado
+                  </span>
+                  <span
+                    id="venda-recebido-hint"
+                    className="mt-0.5 block text-xs leading-relaxed text-muted"
+                  >
+                    Marque somente depois de conferir o {rotuloForma(forma).toLowerCase()}.
+                    Sem a confirmação, a venda fica com data prevista de recebimento.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {statusPagamento === "A_PRAZO" ? (
+              <Field
+                label={rotuloData}
+                htmlFor="venda-vencimento"
+                required
+                error={erros["venda-vencimento"]}
+                hint="Data prevista para a entrada do valor no caixa."
+              >
+                <input
+                  id="venda-vencimento"
+                  data-testid="venda-primeiro-vencimento"
+                  name="primeiroVencimento"
+                  type="date"
+                  value={primeiroVencimento}
+                  min={dataPedido || undefined}
+                  onChange={(evento) => {
+                    setPrimeiroVencimento(evento.target.value);
+                    limparErro("venda-vencimento");
+                  }}
+                  disabled={salvando}
+                  aria-invalid={Boolean(erros["venda-vencimento"]) || undefined}
+                  aria-describedby={descricao("venda-vencimento", "dica")}
+                  className={inputBase}
+                />
+              </Field>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
             <Field
-              label="Vencimento"
+              label="Bandeira"
+              htmlFor="venda-bandeira"
+              required
+              error={erros["venda-bandeira"]}
+            >
+              <select
+                id="venda-bandeira"
+                data-testid="venda-bandeira"
+                value={bandeira}
+                onChange={(evento) => {
+                  setBandeira(evento.target.value);
+                  limparErro("venda-bandeira");
+                  limparErro("venda-taxa");
+                }}
+                disabled={salvando}
+                aria-invalid={Boolean(erros["venda-bandeira"]) || undefined}
+                aria-describedby={descricao("venda-bandeira")}
+                className={cn(selectBase, !bandeira && "text-muted")}
+              >
+                <option value="">Selecione a bandeira…</option>
+                {bandeiras.map((opcao) => (
+                  <option key={opcao} value={opcao}>
+                    {opcao}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <fieldset disabled={salvando}>
+              <legend className="mb-1.5 block text-sm font-semibold text-navy">
+                Modalidade
+              </legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { valor: "DEBITO", rotulo: "Débito", testId: "venda-modalidade-debito" },
+                    { valor: "CREDITO", rotulo: "Crédito", testId: "venda-modalidade-credito" },
+                  ] as const
+                ).map((opcao) => {
+                  const selecionado = modalidade === opcao.valor;
+                  return (
+                    <button
+                      key={opcao.valor}
+                      type="button"
+                      data-testid={opcao.testId}
+                      aria-pressed={selecionado}
+                      onClick={() => escolherModalidade(opcao.valor)}
+                      disabled={salvando}
+                      className={cn(
+                        "min-h-12 rounded-xl border px-2 text-sm font-semibold transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40",
+                        selecionado
+                          ? "border-pink bg-pink-50 text-plum"
+                          : "border-line bg-white text-navy hover:bg-pink-50/60",
+                      )}
+                    >
+                      {opcao.rotulo}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {ehCredito ? (
+              <Field
+                label="Parcelas"
+                htmlFor="venda-parcelas"
+                required
+                error={erros["venda-parcelas"]}
+                hint="O número de parcelas define a taxa aplicada."
+              >
+                <select
+                  id="venda-parcelas"
+                  data-testid="venda-parcelas"
+                  value={parcelas}
+                  onChange={(evento) => {
+                    setParcelas(evento.target.value);
+                    limparErro("venda-parcelas");
+                    limparErro("venda-taxa");
+                  }}
+                  disabled={salvando}
+                  aria-invalid={Boolean(erros["venda-parcelas"]) || undefined}
+                  aria-describedby={descricao("venda-parcelas", "dica")}
+                  className={selectBase}
+                >
+                  {PARCELAS_CREDITO.map((numero) => (
+                    <option key={numero} value={String(numero)}>
+                      {numero}x
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <p className="rounded-xl border border-line bg-slate-50/50 px-3.5 py-3 text-xs text-muted">
+                Débito é liquidado em parcela única.
+              </p>
+            )}
+
+            <Field
+              label="Primeiro vencimento"
               htmlFor="venda-vencimento"
               required
               error={erros["venda-vencimento"]}
-              hint="Obrigatório para vendas a prazo."
+              hint="As demais parcelas vencem mensalmente a partir desta data."
             >
               <input
                 id="venda-vencimento"
-                data-testid="venda-vencimento"
-                name="vencimento"
+                data-testid="venda-primeiro-vencimento"
+                name="primeiroVencimento"
                 type="date"
-                value={vencimento}
+                value={primeiroVencimento}
                 min={dataPedido || undefined}
-                onChange={(evento) => setVencimento(evento.target.value)}
+                onChange={(evento) => {
+                  setPrimeiroVencimento(evento.target.value);
+                  limparErro("venda-vencimento");
+                }}
                 disabled={salvando}
                 aria-invalid={Boolean(erros["venda-vencimento"]) || undefined}
                 aria-describedby={descricao("venda-vencimento", "dica")}
                 className={inputBase}
               />
             </Field>
-          ) : null}
+
+            {taxaIndisponivel ? (
+              <InlineAlert tom="atencao">
+                <span className="block">
+                  {avisoTaxas
+                    ? `Tabela de taxas indisponível: ${avisoTaxas}`
+                    : `Sem taxa configurada para ${bandeira || "a bandeira selecionada"} · ${rotuloModalidade(modalidade)} · ${parcelasNumero}x.`}
+                </span>
+                <span className="mt-1 block text-xs">
+                  A venda no cartão fica bloqueada até a combinação ser
+                  configurada.
+                </span>
+                {podeConfigurarTaxas ? (
+                  <ButtonLink
+                    href="/financeiro?aba=taxas"
+                    variante="secundario"
+                    tamanho="sm"
+                    className="mt-2"
+                  >
+                    Configurar taxas
+                  </ButtonLink>
+                ) : null}
+              </InlineAlert>
+            ) : taxaSelecionada ? (
+              <p className="rounded-xl bg-pink-50 px-3.5 py-2.5 text-xs font-medium text-plum">
+                Taxa configurada: {resumo.percentual.toLocaleString("pt-BR", {
+                  maximumFractionDigits: 2,
+                })}
+                % para {bandeira} · {rotuloModalidade(modalidade)} · {parcelasNumero}x.
+              </p>
+            ) : null}
+
+            {erros["venda-taxa"] ? (
+              <p role="alert" className="text-xs font-medium text-danger">
+                {erros["venda-taxa"]}
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        <div
+          className="mt-4 rounded-xl border border-line bg-white p-3"
+          data-testid="venda-resumo-pagamento"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+            Resumo do recebimento
+          </p>
+          <dl className="mt-2 space-y-1.5 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted">Bruto</dt>
+              <dd className="font-semibold text-navy" data-testid="venda-bruto">
+                {formatMoeda(totalPreview)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted">
+                Taxa{aliquota !== null ? ` (${resumo.percentual.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)` : ""}
+              </dt>
+              <dd className="font-semibold text-amber-700" data-testid="venda-taxa">
+                {ehCartao && aliquota === null ? "—" : formatMoeda(resumo.taxa)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-line pt-1.5">
+              <dt className="font-semibold text-navy">Líquido</dt>
+              <dd className="text-base font-bold text-plum" data-testid="venda-liquido">
+                {ehCartao && aliquota === null ? "—" : formatMoeda(resumo.liquido)}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            {rotuloForma(forma)}
+            {ehCartao
+              ? ` · ${rotuloModalidade(modalidade)} · ${parcelasNumero}x`
+              : recebido
+                ? " · recebimento confirmado"
+                : " · aguardando recebimento"}
+            . Valores estimados; o servidor recalcula a taxa oficial.
+          </p>
         </div>
       </Card>
 
@@ -515,11 +898,11 @@ export function VendaForm({
         <Button
           type="submit"
           className="w-full sm:flex-1"
-          disabled={salvando}
+          disabled={salvando || taxaIndisponivel}
           data-testid="venda-salvar"
         >
           {salvando ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
-          Confirmar venda
+          Concluir venda
         </Button>
         <ButtonLink href="/vendas" variante="secundario" className="w-full sm:flex-1">
           Cancelar

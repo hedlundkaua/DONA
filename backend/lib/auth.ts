@@ -8,6 +8,7 @@ import { otpPepper } from "./otp";
 export type AuthenticatedUser = {
   id: number;
   negocioId: string;
+  nomeEmpresa: string | null;
   nome: string;
   nomeUsuario: string;
   email: string;
@@ -15,7 +16,12 @@ export type AuthenticatedUser = {
   ativo: boolean;
 };
 
-export type AuthResult = { ok: true; user: AuthenticatedUser; sessionId: string; sessionExpiresAt: Date; csrfToken: string } | { ok: false; response: NextResponse };
+export type AuthResult = { ok: true; user: AuthenticatedUser; authVersion: number; sessionId: string; sessionExpiresAt: Date; csrfToken: string } | { ok: false; response: NextResponse };
+
+export function publicAccount(user: AuthenticatedUser) {
+  const { id, nome, nomeUsuario, email, perfil, ativo, nomeEmpresa } = user;
+  return { id, nome, nomeUsuario, email, perfil, ativo, nomeEmpresa };
+}
 
 const cookieName = () => process.env.NODE_ENV === "production" ? "__Host-dona_session" : "dona_session";
 const errorResponse = (status: number, error: string) => NextResponse.json({ success: false, error }, { status });
@@ -133,6 +139,7 @@ export async function requireUser(request: Request, roles: PerfilUsuario[]): Pro
     user: {
       id: session.usuario.id,
       negocioId: session.usuario.negocioId,
+      nomeEmpresa: session.usuario.negocio.nomeEmpresa,
       nome: session.usuario.nome,
       nomeUsuario: session.usuario.nomeUsuario,
       email: session.usuario.email,
@@ -140,6 +147,7 @@ export async function requireUser(request: Request, roles: PerfilUsuario[]): Pro
       ativo: session.usuario.ativo,
     },
     sessionId: session.id,
+    authVersion: session.authVersion,
     sessionExpiresAt: session.expiraEm,
     csrfToken: csrfForToken(token),
   };
